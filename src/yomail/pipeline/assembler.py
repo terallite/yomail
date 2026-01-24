@@ -215,11 +215,8 @@ class BodyAssembler:
                 current_block.append(idx)
 
             elif label == "OTHER":
-                # Hard break
-                if current_block:
-                    blocks.append(current_block)
-                    current_block = []
-                separator_buffer = []
+                # Neutral - buffer like separator, include if between content
+                separator_buffer.append(idx)
 
             # Note: We don't handle SIGNATURE here as we stop at signature_index
 

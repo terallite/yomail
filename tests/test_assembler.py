@@ -187,21 +187,22 @@ class TestContentBlocks:
 
         assert "Best regards" in assembled.body_text
 
-    def test_other_creates_hard_break(self) -> None:
-        """OTHER lines create hard breaks between blocks."""
+    def test_other_is_neutral(self) -> None:
+        """OTHER lines are neutral and don't break blocks."""
         result = _make_result([
             ("Block 1 line 1", "BODY"),
             ("Block 1 line 2", "BODY"),
-            ("Header noise", "OTHER"),
+            ("Blank line", "OTHER"),
             ("Block 2 line 1", "BODY"),
         ])
         assembler = BodyAssembler()
         assembled = assembler.assemble(result)
 
-        # Without signature, longest block is selected
-        # Both blocks have 2 lines, first wins
+        # OTHER is neutral - all content flows into one block
         assert "Block 1 line 1" in assembled.body_text
-        assert "Header noise" not in assembled.body_text
+        assert "Block 2 line 1" in assembled.body_text
+        # OTHER between content is included (buffered like separator)
+        assert "Blank line" in assembled.body_text
 
 
 class TestBodySelection:
@@ -223,32 +224,36 @@ class TestBodySelection:
         assert "Block 2" in assembled.body_text
 
     def test_without_signature_selects_longest_block(self) -> None:
-        """Without signature, longest block is selected."""
+        """Without signature, longest block is selected (blocks split by leading quote)."""
         result = _make_result([
-            ("Short", "BODY"),
-            ("Noise", "OTHER"),
-            ("Longer line 1", "BODY"),
-            ("Longer line 2", "BODY"),
-            ("Longer line 3", "BODY"),
+            ("> leading quote", "QUOTE"),  # Leading quote - creates first empty block
+            ("Body line 1", "BODY"),
+            ("Body line 2", "BODY"),
+            ("Body line 3", "BODY"),
         ])
         assembler = BodyAssembler()
         assembled = assembler.assemble(result)
 
-        assert "Longer line 1" in assembled.body_text
-        assert "Short" not in assembled.body_text
+        # Body block is selected (leading quote excluded)
+        assert "Body line 1" in assembled.body_text
+        assert "leading quote" not in assembled.body_text
 
-    def test_equal_length_blocks_first_wins(self) -> None:
-        """When blocks have equal length, first one is selected."""
+    def test_without_signature_all_content_in_one_block(self) -> None:
+        """Without signature or quotes, all content flows into one block."""
         result = _make_result([
-            ("First block", "BODY"),
-            ("Noise", "OTHER"),
-            ("Second block", "BODY"),
+            ("Greeting", "GREETING"),
+            ("", "OTHER"),
+            ("Body content", "BODY"),
+            ("", "OTHER"),
+            ("Closing", "CLOSING"),
         ])
         assembler = BodyAssembler()
         assembled = assembler.assemble(result)
 
-        assert "First block" in assembled.body_text
-        assert "Second block" not in assembled.body_text
+        # All content in one block
+        assert "Greeting" in assembled.body_text
+        assert "Body content" in assembled.body_text
+        assert "Closing" in assembled.body_text
 
 
 class TestEmptyInput:

@@ -262,10 +262,9 @@ _Contextual (window ±2 lines):_
 
 3. **Build content blocks:**
    - BODY lines accumulate into current block
-   - SEPARATOR lines are buffered; included if followed by more BODY (merging behavior)
+   - SEPARATOR and OTHER lines are buffered; included if followed by more content (neutral filler)
    - Inline QUOTE lines are included in current block
    - GREETING and CLOSING lines are included if adjacent to BODY
-   - OTHER lines create hard breaks between blocks
    - Trailing/leading QUOTE lines create hard breaks
 
 4. **Select final body:**
