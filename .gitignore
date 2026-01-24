@@ -1,0 +1,15 @@
+# Python-generated files
+__pycache__/
+*.py[oc]
+*.egg-info/
+
+# Virtual environments
+.venv/
+
+# Type checker and linter caches
+.mypy_cache/
+.ruff_cache/
+.pytest_cache/
+
+# Internal working docs (not checked in)
+.internal/
