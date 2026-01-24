@@ -259,7 +259,7 @@ def get_expected_body(example: dict) -> str:
     else:
         selected_lines = max(blocks, key=len) if blocks else []
 
-    return "\n".join(selected_lines)
+    return "\n".join(selected_lines)  # type: ignore[arg-type]
 
 
 def get_ground_truth_labels(example: dict) -> list[Label]:
