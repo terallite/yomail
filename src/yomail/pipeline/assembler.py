@@ -114,8 +114,10 @@ class BodyAssembler:
     ) -> set[int]:
         """Find indices of inline quote lines.
 
-        A QUOTE line is "inline" if there exists BODY-labeled content
-        both before AND after it (within the pre-signature region).
+        A QUOTE line is "inline" if there exists content (GREETING, BODY, or
+        CLOSING) both before AND after it (within the pre-signature region).
+        Only quotes at the very top (before any content) or very bottom
+        (after all content) are considered leading/trailing.
 
         Args:
             labeled_lines: Sequence of labeled lines.
@@ -127,24 +129,25 @@ class BodyAssembler:
         # Determine the range to consider (up to but not including signature)
         end_index = signature_index if signature_index is not None else len(labeled_lines)
 
-        # Find all BODY line indices in the range
-        body_indices: list[int] = []
+        # Find all content line indices (GREETING, BODY, CLOSING)
+        content_labels = {"GREETING", "BODY", "CLOSING"}
+        content_indices: list[int] = []
         for idx in range(end_index):
-            if labeled_lines[idx].label == "BODY":
-                body_indices.append(idx)
+            if labeled_lines[idx].label in content_labels:
+                content_indices.append(idx)
 
-        if len(body_indices) < 2:
-            # Need at least 2 BODY lines to have something before and after a quote
+        if len(content_indices) < 2:
+            # Need at least 2 content lines to have something before and after a quote
             return set()
 
-        first_body = body_indices[0]
-        last_body = body_indices[-1]
+        first_content = content_indices[0]
+        last_content = content_indices[-1]
 
-        # Find QUOTE lines that are between first and last BODY lines
+        # Find QUOTE lines that are between first and last content lines
         inline_quotes: set[int] = set()
         for idx in range(end_index):
             if labeled_lines[idx].label == "QUOTE":
-                if first_body < idx < last_body:
+                if first_content < idx < last_content:
                     inline_quotes.add(idx)
 
         return inline_quotes

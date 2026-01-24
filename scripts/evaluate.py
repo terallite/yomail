@@ -92,7 +92,10 @@ class EvaluationResults:
     exact_matches: int = 0
     content_matches: int = 0  # Matches after whitespace normalization
     acceptable: int = 0
-    failed: int = 0
+
+    # Failure categories
+    failed_static: int = 0  # Correctly rejected (exception raised) - acceptable
+    confident_wrong: int = 0  # Returned wrong result confidently - dangerous
 
     # Error breakdown
     errors_by_type: Counter = field(default_factory=Counter)
@@ -105,6 +108,7 @@ class EvaluationResults:
 
     # Failed examples for analysis
     failures: list[ExtractionEvaluation] = field(default_factory=list)
+    confident_wrong_examples: list[ExtractionEvaluation] = field(default_factory=list)
 
     @property
     def success_rate(self) -> float:
@@ -121,6 +125,10 @@ class EvaluationResults:
     @property
     def acceptable_rate(self) -> float:
         return self.acceptable / self.total if self.total > 0 else 0.0
+
+    @property
+    def confident_wrong_rate(self) -> float:
+        return self.confident_wrong / self.total if self.total > 0 else 0.0
 
     @property
     def avg_confidence(self) -> float:
@@ -203,15 +211,16 @@ def get_expected_body(example: dict) -> str:
 
     end_index = signature_index if signature_index is not None else len(lines_data)
 
-    # Find BODY line indices to determine inline vs trailing quotes
-    body_indices = [i for i, item in enumerate(lines_data[:end_index]) if item["label"] == "BODY"]
+    # Find content line indices (GREETING, BODY, CLOSING) to determine inline vs trailing quotes
+    content_labels = {"GREETING", "BODY", "CLOSING"}
+    content_indices = [i for i, item in enumerate(lines_data[:end_index]) if item["label"] in content_labels]
 
-    if len(body_indices) < 2:
-        first_body = body_indices[0] if body_indices else -1
-        last_body = body_indices[-1] if body_indices else -1
+    if len(content_indices) < 2:
+        first_content = content_indices[0] if content_indices else -1
+        last_content = content_indices[-1] if content_indices else -1
     else:
-        first_body = body_indices[0]
-        last_body = body_indices[-1]
+        first_content = content_indices[0]
+        last_content = content_indices[-1]
 
     # Build content blocks (mimicking BodyAssembler logic)
     content_labels = {"GREETING", "BODY", "CLOSING"}
@@ -235,8 +244,8 @@ def get_expected_body(example: dict) -> str:
             separator_buffer.append(text)
 
         elif label == "QUOTE":
-            # Only include if inline (between first and last BODY)
-            if first_body < idx < last_body:
+            # Only include if inline (between first and last content)
+            if first_content < idx < last_content:
                 current_block.extend(separator_buffer)
                 separator_buffer = []
                 current_block.append(text)
@@ -319,8 +328,13 @@ def evaluate_single(
             results.content_matches += 1
         if acceptable:
             results.acceptable += 1
+
+        # Confident wrong = returned result but content is wrong (not even close)
+        if not content_match:
+            results.confident_wrong += 1
     else:
-        results.failed += 1
+        # Failed static - correctly rejected
+        results.failed_static += 1
         if result.error:
             error_type = type(result.error).__name__
             results.errors_by_type[error_type] += 1
@@ -354,10 +368,13 @@ def evaluate_single(
         metadata=metadata,
     )
 
-    # Track failures for analysis (only significant failures, not whitespace differences)
+    # Track failures for analysis
     content_match = success and extracted and normalize_whitespace(extracted) == normalize_whitespace(expected_body)
     if not content_match:
         results.failures.append(evaluation)
+        # Track confident wrong separately (most dangerous)
+        if success and extracted:
+            results.confident_wrong_examples.append(evaluation)
 
     if verbose and not content_match:
         template_type = metadata.get("template_type", "unknown")
@@ -383,15 +400,21 @@ def print_results(results: EvaluationResults):
     # Primary metrics
     print("\n--- Primary Metrics ---")
     print(f"Total examples:      {results.total}")
-    print(f"Success rate:        {100 * results.success_rate:.2f}% ({results.successful}/{results.total})")
-    print(f"Exact match rate:    {100 * results.exact_match_rate:.2f}% ({results.exact_matches}/{results.total})")
-    print(f"Content match rate:  {100 * results.content_match_rate:.2f}% ({results.content_matches}/{results.total})")
     print(f"Acceptable rate:     {100 * results.acceptable_rate:.2f}% ({results.acceptable}/{results.total})")
+    print(f"Content match rate:  {100 * results.content_match_rate:.2f}% ({results.content_matches}/{results.total})")
+    print(f"Exact match rate:    {100 * results.exact_match_rate:.2f}% ({results.exact_matches}/{results.total})")
+
+    # Critical failure metrics
+    print("\n--- Failure Analysis ---")
+    print(f"Failed static:       {results.failed_static} (correctly rejected - acceptable)")
+    confident_wrong_pct = 100 * results.confident_wrong_rate
+    target_status = "OK" if results.confident_wrong_rate <= 0.001 else "ABOVE TARGET"
+    print(f"Confident wrong:     {results.confident_wrong} ({confident_wrong_pct:.2f}% - target <0.1%) [{target_status}]")
 
     # Confidence stats
     if results.confidences:
         confidences = sorted(results.confidences)
-        print(f"\n--- Confidence Distribution ---")
+        print("\n--- Confidence Distribution ---")
         print(f"Mean:    {results.avg_confidence:.3f}")
         print(f"Min:     {min(confidences):.3f}")
         print(f"Max:     {max(confidences):.3f}")
@@ -401,13 +424,13 @@ def print_results(results: EvaluationResults):
 
     # Error breakdown
     if results.errors_by_type:
-        print(f"\n--- Error Breakdown ---")
+        print("\n--- Error Breakdown ---")
         for error_type, count in results.errors_by_type.most_common():
             print(f"  {error_type}: {count}")
 
     # Per-label metrics
     if results.label_metrics:
-        print(f"\n--- Per-Label Metrics ---")
+        print("\n--- Per-Label Metrics ---")
         print(f"{'Label':<12} {'Precision':>10} {'Recall':>10} {'F1':>10}")
         print("-" * 44)
         for label in LABELS:
@@ -415,9 +438,16 @@ def print_results(results: EvaluationResults):
                 m = results.label_metrics[label]
                 print(f"{label:<12} {m.precision:>10.3f} {m.recall:>10.3f} {m.f1:>10.3f}")
 
-    # Failure analysis by template type
+    # Confident wrong breakdown (most critical)
+    if results.confident_wrong_examples:
+        print("\n--- Confident Wrong by Template Type ---")
+        wrong_types = Counter(f.metadata.get("template_type", "unknown") for f in results.confident_wrong_examples)
+        for template_type, count in wrong_types.most_common():
+            print(f"  {template_type}: {count}")
+
+    # All failures by template type
     if results.failures:
-        print(f"\n--- Failures by Template Type ---")
+        print("\n--- All Failures by Template Type ---")
         failure_types = Counter(f.metadata.get("template_type", "unknown") for f in results.failures)
         for template_type, count in failure_types.most_common():
             print(f"  {template_type}: {count}")

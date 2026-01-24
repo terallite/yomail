@@ -255,8 +255,8 @@ _Contextual (window ±2 lines):_
 1. **Find signature boundary:** Scan for first line labeled SIGNATURE. If found, all content from that line onward is excluded from body consideration.
 
 2. **Classify quotes as inline vs trailing:**
-   - A QUOTE line is "inline" if there exists BODY-labeled content both before AND after it
-   - Otherwise, it is "trailing" (or "leading") and excluded from body
+   - A QUOTE line is "inline" if there exists content (GREETING, BODY, or CLOSING) both before AND after it
+   - Only quotes at the very top (before any content) or very bottom (after all content) are considered leading/trailing and excluded from body
 
 3. **Build content blocks:**
    - BODY lines accumulate into current block
@@ -280,7 +280,7 @@ _Contextual (window ±2 lines):_
 
 **Confidence computation:**
 
-- Base confidence: minimum marginal probability among body-labeled lines (weakest link)
+- Base confidence: 10th percentile (P10) of marginal probabilities among body-labeled lines. Robust to outliers - one weak transition line won't tank the extraction. For sequences with <10 lines, P10 falls back to minimum.
 - Ambiguity penalty: if high-confidence BODY labels exist outside the selected body region, reduce confidence (suggests competing valid interpretations)
 
 **Thresholds:**
