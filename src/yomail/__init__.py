@@ -8,11 +8,17 @@ from yomail.exceptions import (
 )
 from yomail.pipeline import (
     AnnotatedLine,
+    CRFSequenceLabeler,
+    CRFTrainer,
     ExtractedFeatures,
     FeatureExtractor,
+    Label,
+    LabeledLine,
+    LABELS,
     LineFeatures,
     NormalizedEmail,
     Normalizer,
+    SequenceLabelingResult,
     StructuralAnalysis,
     StructuralAnalyzer,
 )
@@ -21,15 +27,21 @@ __version__ = "0.1.0"
 
 __all__ = [
     "AnnotatedLine",
+    "CRFSequenceLabeler",
+    "CRFTrainer",
     "ExtractionError",
     "ExtractedFeatures",
     "FeatureExtractor",
     "InvalidInputError",
+    "Label",
+    "LabeledLine",
+    "LABELS",
     "LineFeatures",
     "LowConfidenceError",
     "NoBodyDetectedError",
     "NormalizedEmail",
     "Normalizer",
+    "SequenceLabelingResult",
     "StructuralAnalysis",
     "StructuralAnalyzer",
 ]
