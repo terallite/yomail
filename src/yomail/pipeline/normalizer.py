@@ -68,6 +68,9 @@ class Normalizer:
     # Dash-like characters for unification
     _DASH_CHARS = frozenset("-ー")
 
+    # Zero-width characters to strip (invisible noise)
+    _ZERO_WIDTH_CHARS = "\ufeff\u200b\u200c\u200d\u2060"
+
     def _normalize_japanese(self, text: str) -> str:
         """Apply Japanese-specific normalization.
 
@@ -86,6 +89,10 @@ class Normalizer:
 
         # NFKC for remaining Unicode normalization
         text = unicodedata.normalize("NFKC", text)
+
+        # Strip zero-width characters (neologdn only strips standalone BOM)
+        for ch in self._ZERO_WIDTH_CHARS:
+            text = text.replace(ch, "")
 
         # Unify dashes in delimiter-only lines
         text = self._unify_delimiter_lines(text)
