@@ -198,6 +198,22 @@ class TestChoonpuLineNormalization:
         assert result.lines[1] == "-" * 10
         assert result.lines[2] == "田中です"
 
+    def test_decorative_delimiter_preserves_shape(self) -> None:
+        """Delimiter lines with decorative chars preserve shape."""
+        normalizer = Normalizer()
+        # Stars with box drawing dashes
+        result = normalizer.normalize("★━━━━━━━━━━★")
+
+        # Stars preserved, dashes become hyphens
+        assert result.lines[0] == "★----------★"
+
+    def test_bracket_delimiter_preserved(self) -> None:
+        """Delimiter lines with brackets preserved."""
+        normalizer = Normalizer()
+        result = normalizer.normalize("【========================】")
+
+        assert result.lines[0] == "【========================】"
+
 
 class TestZeroWidthCharacters:
     """Tests for zero-width character stripping."""

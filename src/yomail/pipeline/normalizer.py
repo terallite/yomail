@@ -72,29 +72,48 @@ class Normalizer:
     _ZERO_WIDTH_CHARS = "\ufeff\u200b\u200c\u200d\u2060"
 
     # CHOONPUS from neologdn - these get collapsed (ーーー→ー)
-    # Lines containing only these chars skip neologdn to preserve length
     _CHOONPUS = frozenset("﹣－ｰ—―─━ー")
 
-    def _is_choonpu_line(self, line: str) -> bool:
-        """Check if line consists only of CHOONPU/whitespace characters."""
+    # Delimiter line chars - lines with only these skip neologdn
+    # Includes CHOONPUS plus decorative symbols used in email signatures
+    _DELIMITER_CHARS = frozenset(
+        "﹣－ｰ—―─━ー"  # CHOONPUS (dashes that collapse)
+        "★☆◆◇■□●○▲△▼▽"  # decorative shapes
+        "【】〔〕「」『』《》〈〉"  # brackets
+        "="  # equals (often mixed with dashes)
+    )
+
+    def _is_delimiter_line(self, line: str) -> bool:
+        """Check if line consists only of delimiter characters.
+
+        Delimiter lines skip neologdn to prevent CHOONPU collapsing.
+        Includes dashes, decorative shapes, and brackets.
+        """
         # Strip zero-width chars first (they shouldn't affect detection)
         for ch in self._ZERO_WIDTH_CHARS:
             line = line.replace(ch, "")
         stripped = line.strip()
         if not stripped:
             return False
-        return all(c in self._CHOONPUS for c in stripped)
+        return all(c in self._DELIMITER_CHARS for c in stripped)
 
-    def _normalize_choonpu_line(self, line: str) -> str:
-        """Normalize a CHOONPU-only line to ASCII hyphens.
+    def _normalize_delimiter_line(self, line: str) -> str:
+        """Normalize a delimiter line.
 
-        Preserves CHOONPU count but converts all to '-'.
+        Converts CHOONPU chars to '-', preserves other delimiter chars.
         Strips whitespace and zero-width characters.
         """
         # Strip zero-width chars first
         for ch in self._ZERO_WIDTH_CHARS:
             line = line.replace(ch, "")
-        return "-" * sum(1 for c in line if c in self._CHOONPUS)
+        # Convert CHOONPUS to hyphen, keep other delimiter chars
+        result = []
+        for c in line:
+            if c in self._CHOONPUS:
+                result.append("-")
+            elif c in self._DELIMITER_CHARS or c.isspace():
+                result.append(c)
+        return "".join(result).strip()
 
     def _normalize_japanese(self, text: str) -> str:
         """Apply Japanese-specific normalization.
@@ -111,14 +130,14 @@ class Normalizer:
 
         NFKC handles remaining Unicode compatibility decomposition.
         """
-        # Process line by line to protect CHOONPU-only lines
+        # Process line by line to protect delimiter lines from CHOONPU collapsing
         lines = text.split("\n")
         normalized_lines = []
 
         for line in lines:
-            if self._is_choonpu_line(line):
-                # Skip neologdn, just convert to ASCII hyphens
-                normalized_lines.append(self._normalize_choonpu_line(line))
+            if self._is_delimiter_line(line):
+                # Skip neologdn, normalize delimiter chars directly
+                normalized_lines.append(self._normalize_delimiter_line(line))
             else:
                 # Full normalization
                 normalized = neologdn.normalize(line)
