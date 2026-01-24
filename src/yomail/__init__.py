@@ -6,6 +6,7 @@ from yomail.exceptions import (
     LowConfidenceError,
     NoBodyDetectedError,
 )
+from yomail.extractor import EmailBodyExtractor, ExtractionResult
 from yomail.pipeline import (
     AnnotatedLine,
     AssembledBody,
@@ -37,7 +38,9 @@ __all__ = [
     "ConfidenceResult",
     "CRFSequenceLabeler",
     "CRFTrainer",
+    "EmailBodyExtractor",
     "ExtractionError",
+    "ExtractionResult",
     "ExtractedFeatures",
     "FeatureExtractor",
     "InvalidInputError",
