@@ -1,5 +1,7 @@
 """Pipeline components for email body extraction."""
 
+from yomail.pipeline.assembler import AssembledBody, BodyAssembler
+from yomail.pipeline.confidence import ConfidenceGate, ConfidenceResult
 from yomail.pipeline.crf import (
     LABELS,
     CRFSequenceLabeler,
@@ -14,6 +16,10 @@ from yomail.pipeline.structural import AnnotatedLine, StructuralAnalysis, Struct
 
 __all__ = [
     "AnnotatedLine",
+    "AssembledBody",
+    "BodyAssembler",
+    "ConfidenceGate",
+    "ConfidenceResult",
     "CRFSequenceLabeler",
     "CRFTrainer",
     "ExtractedFeatures",

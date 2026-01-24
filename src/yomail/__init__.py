@@ -8,6 +8,10 @@ from yomail.exceptions import (
 )
 from yomail.pipeline import (
     AnnotatedLine,
+    AssembledBody,
+    BodyAssembler,
+    ConfidenceGate,
+    ConfidenceResult,
     CRFSequenceLabeler,
     CRFTrainer,
     ExtractedFeatures,
@@ -27,6 +31,10 @@ __version__ = "0.1.0"
 
 __all__ = [
     "AnnotatedLine",
+    "AssembledBody",
+    "BodyAssembler",
+    "ConfidenceGate",
+    "ConfidenceResult",
     "CRFSequenceLabeler",
     "CRFTrainer",
     "ExtractionError",
