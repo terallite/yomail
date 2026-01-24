@@ -77,6 +77,9 @@ class Normalizer:
 
     def _is_choonpu_line(self, line: str) -> bool:
         """Check if line consists only of CHOONPU/whitespace characters."""
+        # Strip zero-width chars first (they shouldn't affect detection)
+        for ch in self._ZERO_WIDTH_CHARS:
+            line = line.replace(ch, "")
         stripped = line.strip()
         if not stripped:
             return False
@@ -85,9 +88,12 @@ class Normalizer:
     def _normalize_choonpu_line(self, line: str) -> str:
         """Normalize a CHOONPU-only line to ASCII hyphens.
 
-        Preserves length but converts all CHOONPUS to '-'.
-        Strips whitespace and invisible characters.
+        Preserves CHOONPU count but converts all to '-'.
+        Strips whitespace and zero-width characters.
         """
+        # Strip zero-width chars first
+        for ch in self._ZERO_WIDTH_CHARS:
+            line = line.replace(ch, "")
         return "-" * sum(1 for c in line if c in self._CHOONPUS)
 
     def _normalize_japanese(self, text: str) -> str:

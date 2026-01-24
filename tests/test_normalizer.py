@@ -239,6 +239,15 @@ class TestZeroWidthCharacters:
 
         assert result.lines[0] == "------------"
 
+    def test_zero_width_in_choonpu_line_stripped(self) -> None:
+        """Zero-width chars in CHOONPU lines don't prevent detection."""
+        normalizer = Normalizer()
+        # Box drawing with embedded ZWSP - should still detect as CHOONPU line
+        result = normalizer.normalize("─────────\u200b───────────")
+
+        # Should be 20 hyphens (not collapsed ーー)
+        assert result.lines[0] == "-" * 20
+
 
 class TestNormalizedEmailDataclass:
     """Tests for the NormalizedEmail dataclass."""
