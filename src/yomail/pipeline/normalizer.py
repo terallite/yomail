@@ -71,10 +71,31 @@ class Normalizer:
     # Zero-width characters to strip (invisible noise)
     _ZERO_WIDTH_CHARS = "\ufeff\u200b\u200c\u200d\u2060"
 
+    # CHOONPUS from neologdn - these get collapsed (ーーー→ー)
+    # Lines containing only these chars skip neologdn to preserve length
+    _CHOONPUS = frozenset("﹣－ｰ—―─━ー")
+
+    def _is_choonpu_line(self, line: str) -> bool:
+        """Check if line consists only of CHOONPU/whitespace characters."""
+        stripped = line.strip()
+        if not stripped:
+            return False
+        return all(c in self._CHOONPUS for c in stripped)
+
+    def _normalize_choonpu_line(self, line: str) -> str:
+        """Normalize a CHOONPU-only line to ASCII hyphens.
+
+        Preserves length but converts all CHOONPUS to '-'.
+        Strips whitespace and invisible characters.
+        """
+        return "-" * sum(1 for c in line if c in self._CHOONPUS)
+
     def _normalize_japanese(self, text: str) -> str:
         """Apply Japanese-specific normalization.
 
         Uses neologdn followed by NFKC normalization.
+        Lines containing only CHOONPU characters skip neologdn
+        to prevent repeat collapsing (ーーー→ー).
 
         neologdn handles:
         - Full-width ASCII → half-width (Ａ→A, １→1)
@@ -84,17 +105,26 @@ class Normalizer:
 
         NFKC handles remaining Unicode compatibility decomposition.
         """
-        # neologdn first (Japanese-specific normalization)
-        text = neologdn.normalize(text)
+        # Process line by line to protect CHOONPU-only lines
+        lines = text.split("\n")
+        normalized_lines = []
 
-        # NFKC for remaining Unicode normalization
-        text = unicodedata.normalize("NFKC", text)
+        for line in lines:
+            if self._is_choonpu_line(line):
+                # Skip neologdn, just convert to ASCII hyphens
+                normalized_lines.append(self._normalize_choonpu_line(line))
+            else:
+                # Full normalization
+                normalized = neologdn.normalize(line)
+                normalized = unicodedata.normalize("NFKC", normalized)
+                # Strip zero-width characters
+                for ch in self._ZERO_WIDTH_CHARS:
+                    normalized = normalized.replace(ch, "")
+                normalized_lines.append(normalized)
 
-        # Strip zero-width characters (neologdn only strips standalone BOM)
-        for ch in self._ZERO_WIDTH_CHARS:
-            text = text.replace(ch, "")
+        text = "\n".join(normalized_lines)
 
-        # Unify dashes in delimiter-only lines
+        # Unify dashes in delimiter-only lines (for mixed dash lines that went through neologdn)
         text = self._unify_delimiter_lines(text)
 
         return text
