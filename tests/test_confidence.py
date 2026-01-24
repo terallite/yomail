@@ -55,8 +55,8 @@ class TestBaseConfidence:
 
         assert result.base_confidence == 0.85
 
-    def test_minimum_confidence_used(self) -> None:
-        """Base confidence is minimum among body lines."""
+    def test_p10_small_set_uses_minimum(self) -> None:
+        """For <10 lines, P10 falls back to minimum (index 0)."""
         lines = (
             _make_labeled_line("Line 1", "BODY", confidence=0.95),
             _make_labeled_line("Line 2", "BODY", confidence=0.70),  # Weakest
@@ -74,7 +74,32 @@ class TestBaseConfidence:
         gate = ConfidenceGate()
         result = gate.compute(labeling, assembled)
 
+        # With 3 lines, P10 index = 3 // 10 = 0, so minimum is used
         assert result.base_confidence == 0.70
+
+    def test_p10_ignores_single_weak_outlier(self) -> None:
+        """For 10+ lines, P10 ignores the single weakest line."""
+        # 10 lines: 9 high confidence, 1 weak outlier
+        lines = tuple(
+            _make_labeled_line(f"Line {i}", "BODY", confidence=0.90)
+            for i in range(9)
+        ) + (_make_labeled_line("Weak line", "BODY", confidence=0.40),)
+
+        labeling = SequenceLabelingResult(labeled_lines=lines, sequence_probability=0.9)
+        assembled = AssembledBody(
+            body_text="\n".join(f"Line {i}" for i in range(10)),
+            body_lines=tuple(range(10)),
+            signature_index=None,
+            inline_quote_count=0,
+            success=True,
+        )
+
+        gate = ConfidenceGate()
+        result = gate.compute(labeling, assembled)
+
+        # With 10 lines, P10 index = 10 // 10 = 1
+        # Sorted confidences: [0.40, 0.90, 0.90, ...], so P10 = 0.90
+        assert result.base_confidence == 0.90
 
     def test_empty_body_zero_confidence(self) -> None:
         """Empty body has zero confidence."""

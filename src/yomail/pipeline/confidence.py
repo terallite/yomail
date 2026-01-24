@@ -24,7 +24,7 @@ class ConfidenceResult:
 
     Attributes:
         confidence: Final confidence score (0.0 to 1.0).
-        base_confidence: Minimum marginal probability among body lines.
+        base_confidence: 10th percentile of marginal probabilities among body lines.
         ambiguity_penalty: Penalty applied for ambiguous extractions.
         passes_threshold: Whether confidence meets the threshold.
         threshold: The threshold that was applied.
@@ -43,7 +43,8 @@ class ConfidenceGate:
     """Computes and validates extraction confidence.
 
     Confidence computation (per DESIGN.md section 3.6):
-    - Base confidence: minimum marginal probability among body-labeled lines
+    - Base confidence: 10th percentile (P10) of marginal probabilities among
+      body-labeled lines. Robust to outliers - one weak line won't tank the score.
     - Ambiguity penalty: if high-confidence BODY labels exist outside the
       selected body region, reduce confidence
 
@@ -93,7 +94,7 @@ class ConfidenceGate:
         labeled_lines = labeling_result.labeled_lines
         body_indices = set(assembled.body_lines)
 
-        # Base confidence: minimum marginal probability among selected body lines
+        # Base confidence: P10 of marginal probabilities among selected body lines
         base_confidence = self._compute_base_confidence(labeled_lines, body_indices)
 
         # Ambiguity penalty: high-confidence BODY labels outside selected region
@@ -118,28 +119,29 @@ class ConfidenceGate:
         labeled_lines: tuple[LabeledLine, ...],
         body_indices: set[int],
     ) -> float:
-        """Compute base confidence as minimum marginal probability of body lines.
+        """Compute base confidence as 10th percentile of body line confidences.
 
-        The "weakest link" approach - confidence is limited by the least
-        confident body line.
+        P10 is robust to outliers - one weak line won't tank the score.
+        For sequences with 1-9 lines, P10 equals the minimum (fallback).
+        For 10+ lines, ignores the worst line(s).
 
         Args:
             labeled_lines: All labeled lines.
             body_indices: Indices of lines selected for body.
 
         Returns:
-            Minimum confidence among body lines, or 0.0 if no body lines.
+            P10 confidence among body lines, or 0.0 if no body lines.
         """
         if not body_indices:
             return 0.0
 
-        min_confidence = 1.0
-        for idx in body_indices:
-            line = labeled_lines[idx]
-            # Use the confidence of the line's actual predicted label
-            min_confidence = min(min_confidence, line.confidence)
+        confidences = sorted(labeled_lines[idx].confidence for idx in body_indices)
 
-        return min_confidence
+        # P10: value at 10th percentile
+        # For n=10, index=1 (ignores worst)
+        # For n<10, index=0 (MIN fallback)
+        p10_index = max(0, len(confidences) // 10)
+        return confidences[p10_index]
 
     def _compute_ambiguity_penalty(
         self,
