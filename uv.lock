@@ -21,6 +21,56 @@ wheels = [
 ]
 
 [[package]]
+name = "neologdn"
+version = "0.5.6"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/17/33/62ac03093b700f6669fc44be9db39aa8ec05e8e2e53ac312ad146adaf1ce/neologdn-0.5.6.tar.gz", hash = "sha256:8f93ebf1dda431a32264980d4b03060bb6f08d3f16add53b453850461c07e1e6", size = 105199, upload-time = "2025-12-02T05:50:22.858Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/82/50/ce1d7668b278ae4a68ee26e7b31fd92b52387cba575bf203363114cf6b1f/neologdn-0.5.6-cp313-cp313-macosx_10_13_universal2.whl", hash = "sha256:25a92e04cfd2ddc1a96f190a553abb111ab1c0ad0b43f3e5b7e40147a82cda05", size = 83927, upload-time = "2025-12-02T05:48:52.327Z" },
+    { url = "https://files.pythonhosted.org/packages/a6/e1/16dc809b10a21f302a56ec5318cb0b2f141514886705ca60696c1d378610/neologdn-0.5.6-cp313-cp313-macosx_10_13_x86_64.whl", hash = "sha256:9277ee1290e78dd5303027e38ed17e2765c2af1fcba669abfe5d9059e466a615", size = 47624, upload-time = "2025-12-02T05:48:53.307Z" },
+    { url = "https://files.pythonhosted.org/packages/41/ef/31ecfb896288a446e60df33b88e372a6647fe23b38e79c913ad89144bf5c/neologdn-0.5.6-cp313-cp313-macosx_11_0_arm64.whl", hash = "sha256:76f2b243612cda186429ffa25d54d469efb7db8c9244e823bada1c51ab8a4984", size = 45862, upload-time = "2025-12-02T05:48:54.341Z" },
+    { url = "https://files.pythonhosted.org/packages/c9/74/b2c5b4e058029a148eb03de55e61af8346bee55e6a104995b6c325e38ef7/neologdn-0.5.6-cp313-cp313-manylinux_2_24_aarch64.manylinux_2_28_aarch64.whl", hash = "sha256:8f390b87dd94a1c7851d95ff12c783023c0365cb1764f3f4daad1a004df241d4", size = 261566, upload-time = "2025-12-02T05:48:55.391Z" },
+    { url = "https://files.pythonhosted.org/packages/fd/04/e9d4e6e63ef80f986046d1865d2fd90107fb24cc095705d96fb9099f87ad/neologdn-0.5.6-cp313-cp313-manylinux_2_24_ppc64le.manylinux_2_28_ppc64le.whl", hash = "sha256:c413a7b5ee569d1f1cb4a9dad2cd7da7478193c5f2b933a9417bee74e83ff9ec", size = 268733, upload-time = "2025-12-02T05:48:56.847Z" },
+    { url = "https://files.pythonhosted.org/packages/1d/ed/ff1836c630dec187b7b0cd63a9a0b7273c4faab0f5e03b438e18b5764661/neologdn-0.5.6-cp313-cp313-manylinux_2_24_s390x.manylinux_2_28_s390x.whl", hash = "sha256:9f8bb185710cf749cb00374a61099040c59ec4be9a067de25b347d1ca12fcddf", size = 273136, upload-time = "2025-12-02T05:48:58.062Z" },
+    { url = "https://files.pythonhosted.org/packages/4e/a3/faa29bb0faafc49b3e4e1638bee8a09bb6dab769d359c0dcc437cad0659f/neologdn-0.5.6-cp313-cp313-manylinux_2_24_x86_64.manylinux_2_28_x86_64.whl", hash = "sha256:5f62fa856cb8051f2f9705d4bd867b95f76ab641fabe55d5982af3aa85b0f791", size = 266393, upload-time = "2025-12-02T05:48:59.288Z" },
+    { url = "https://files.pythonhosted.org/packages/ea/7b/143c1639721d81ddb7763d26fbb38cdff716196b1956d9ae91d77911700c/neologdn-0.5.6-cp313-cp313-musllinux_1_2_aarch64.whl", hash = "sha256:f1d4115458680e02d30480dba7ba16001b646a7108f939f38db83495a88bd92f", size = 1234561, upload-time = "2025-12-02T05:49:00.562Z" },
+    { url = "https://files.pythonhosted.org/packages/b8/89/0421b6bddd087803459e3342ebbdb8fe01c111025c1b06738255ae265a6f/neologdn-0.5.6-cp313-cp313-musllinux_1_2_ppc64le.whl", hash = "sha256:cf17881f495754d50bd537e987eae1379c93beec6718ae67a767338cf378775a", size = 1321046, upload-time = "2025-12-02T05:49:02.033Z" },
+    { url = "https://files.pythonhosted.org/packages/ee/cf/7aa4e6292ca913a2acd482f8bfcc8e38cde7853a7889d4e4fea0cb884991/neologdn-0.5.6-cp313-cp313-musllinux_1_2_s390x.whl", hash = "sha256:407960196b75b14355716572e78bad79d55f146a311799f20e2e7ccf932074dc", size = 1435283, upload-time = "2025-12-02T05:49:03.776Z" },
+    { url = "https://files.pythonhosted.org/packages/f5/69/36690650324a0886f8124f98269465993635211e02902e76c82791018784/neologdn-0.5.6-cp313-cp313-musllinux_1_2_x86_64.whl", hash = "sha256:d69230bc9f964cff36718b1d84c4aa33cd06532845f2192a82be0f9be0b45fa1", size = 1293545, upload-time = "2025-12-02T05:49:05.122Z" },
+    { url = "https://files.pythonhosted.org/packages/d3/1f/bb248512a3f934cea54912e07bd11a55991168c203aa61ab4b0f300eb92f/neologdn-0.5.6-cp313-cp313-win32.whl", hash = "sha256:4841c66642341f61cfe32af184ad54af3c077d55ece0801a578e96bf3312c9ea", size = 44052, upload-time = "2025-12-02T05:49:06.603Z" },
+    { url = "https://files.pythonhosted.org/packages/1d/4e/737bc72305a0023514fbe7c53691658661a75e8be62d12d960a159b0e882/neologdn-0.5.6-cp313-cp313-win_amd64.whl", hash = "sha256:de888dc6aaac754cd0be5d6d182266f1e16401e4709f84816a87e9727674d38e", size = 46844, upload-time = "2025-12-02T05:49:07.73Z" },
+    { url = "https://files.pythonhosted.org/packages/5f/65/8154765b0f9657a790566d4d19c2d122d1c33feb0f1654babbe699a6f045/neologdn-0.5.6-cp313-cp313-win_arm64.whl", hash = "sha256:e095cfb700e082489f9a2c089ba5eb0a3a1de212ddc5307bae151bdd322b6beb", size = 41696, upload-time = "2025-12-02T05:49:08.715Z" },
+    { url = "https://files.pythonhosted.org/packages/b7/05/e59dae7aa3c66a61d59efd3ea047f03265c6ede9751a37092c78c4d2f719/neologdn-0.5.6-cp314-cp314-macosx_10_15_universal2.whl", hash = "sha256:c213181b47b4bfb7781fc020a8d37d813341fe6412c37272dea5d7db5aadc0df", size = 83904, upload-time = "2025-12-02T05:49:09.743Z" },
+    { url = "https://files.pythonhosted.org/packages/f2/36/37ba26398c17fe2269f0e228b6cc0e5886b91bba5f5981742edb2cdfde6d/neologdn-0.5.6-cp314-cp314-macosx_10_15_x86_64.whl", hash = "sha256:2cf7babe59d9640137dc7818e4654de369e42bf26d718db04539e334119c7b68", size = 47494, upload-time = "2025-12-02T05:49:10.865Z" },
+    { url = "https://files.pythonhosted.org/packages/33/c1/194e99707aa193d8e485418749f36b5d10e58fd23818dc36ed55525f6d60/neologdn-0.5.6-cp314-cp314-macosx_11_0_arm64.whl", hash = "sha256:0357e085fac0774e380b8fcb237fb00f086163c9f599b5babefd3dc47ac5ee31", size = 45982, upload-time = "2025-12-02T05:49:12.194Z" },
+    { url = "https://files.pythonhosted.org/packages/de/a9/be173067fb26bbcf9883de92d5d896cd758d7b0f1c8ad6ece646858fec35/neologdn-0.5.6-cp314-cp314-manylinux_2_24_aarch64.manylinux_2_28_aarch64.whl", hash = "sha256:9b545a502823792b1c88e521ed3e7adc6df810d91a2ee0e7bbb319d52e976e14", size = 261289, upload-time = "2025-12-02T05:49:13.316Z" },
+    { url = "https://files.pythonhosted.org/packages/b6/05/484f2d82454db4d2ad193e4ce0c6b2c99d9aeb90604f5575df75db098586/neologdn-0.5.6-cp314-cp314-manylinux_2_24_ppc64le.manylinux_2_28_ppc64le.whl", hash = "sha256:b25b6a82c279e9ef6c480db69b4c283102cbd4083714fec57839f6d1ebee0d79", size = 269132, upload-time = "2025-12-02T05:49:14.919Z" },
+    { url = "https://files.pythonhosted.org/packages/68/35/0daa36b8084445c3a08b1ae931170abe715bd0142097be0c74c07097c8dc/neologdn-0.5.6-cp314-cp314-manylinux_2_24_s390x.manylinux_2_28_s390x.whl", hash = "sha256:9f546b11df94f610a6a75600e785fd4a3f3b823091538d66263b7ddf5510d715", size = 269913, upload-time = "2025-12-02T05:49:16.496Z" },
+    { url = "https://files.pythonhosted.org/packages/a9/e0/7073a5aade91db4fd6276c1b2e296995942ad5efcfd8485aa3f6a03eaff2/neologdn-0.5.6-cp314-cp314-manylinux_2_24_x86_64.manylinux_2_28_x86_64.whl", hash = "sha256:83f751bb597958e50fbe5fe46edef1012a5b97ad27cae0f379342506e40ee0ad", size = 264548, upload-time = "2025-12-02T05:49:17.68Z" },
+    { url = "https://files.pythonhosted.org/packages/a7/6d/36701dca57c5dc0adee0a95564e0c82635a3a74c38d80908e2a7bc81cb9e/neologdn-0.5.6-cp314-cp314-musllinux_1_2_aarch64.whl", hash = "sha256:d61c93652b270e0ca7fd29336becc38678e92d58c0426fb31a55bdd30db979f5", size = 1234503, upload-time = "2025-12-02T05:49:18.98Z" },
+    { url = "https://files.pythonhosted.org/packages/e9/3d/e9d1225eef6b055a57a559291593ad3dca6bbf982cde4a4f563251657765/neologdn-0.5.6-cp314-cp314-musllinux_1_2_ppc64le.whl", hash = "sha256:7a1feca3578a672d54bc0d347c81f7f5d956596223eb132ed0bbf3b0ef198482", size = 1320791, upload-time = "2025-12-02T05:49:20.312Z" },
+    { url = "https://files.pythonhosted.org/packages/bb/5c/9b864d5486cf3d753edd132a891c13c46338fa1617db7dab42996ba0a588/neologdn-0.5.6-cp314-cp314-musllinux_1_2_s390x.whl", hash = "sha256:0f9645663413591c127f0fb4baf695c0d01625293771d381ed4925ca74e6e4d6", size = 1433931, upload-time = "2025-12-02T05:49:22.409Z" },
+    { url = "https://files.pythonhosted.org/packages/d0/b3/dd99831fb2f8884d9d3169c377359ee68d263f1213b2ea4fd0fbdebc56af/neologdn-0.5.6-cp314-cp314-musllinux_1_2_x86_64.whl", hash = "sha256:e460610728972441564b9719a0d7a3cdcca18ddd22c3764a47b52d4ab0e9cb23", size = 1292135, upload-time = "2025-12-02T05:49:23.683Z" },
+    { url = "https://files.pythonhosted.org/packages/b2/74/f661e42cbd781ad0b46864932c950fab3b78cf3263b934c75575dc73aca6/neologdn-0.5.6-cp314-cp314-win32.whl", hash = "sha256:7cc61d7cf08ea5357d181ea4ad5e686d842f244ca1ea3b3c1a11504870569e10", size = 45692, upload-time = "2025-12-02T05:49:25.128Z" },
+    { url = "https://files.pythonhosted.org/packages/45/f7/2652432a592755420afcb465fde84ce722598a74395c57d41986a22b2085/neologdn-0.5.6-cp314-cp314-win_amd64.whl", hash = "sha256:1220a9aacfdbda7096324b9a5a0602774049fd1d8fdd8069ecadb49aed97c166", size = 48365, upload-time = "2025-12-02T05:49:26.136Z" },
+    { url = "https://files.pythonhosted.org/packages/4b/fc/5fadb456bafd445112a58b2e33ee838025c65a82d7b6a79591bf0ca939d3/neologdn-0.5.6-cp314-cp314-win_arm64.whl", hash = "sha256:37aa6fc7d31b9f96b156d47637a791e12ea9bacc653e12f4573419462cc62c36", size = 43236, upload-time = "2025-12-02T05:49:27.169Z" },
+    { url = "https://files.pythonhosted.org/packages/67/81/dafa08c4538114bcd57a1e86225649f2b51431e83239965f45452913acca/neologdn-0.5.6-cp314-cp314t-macosx_10_15_universal2.whl", hash = "sha256:e547113d4727e70218d23ca433aeb1bb3bca93e6718c2a7ab4fcbe4e9a24c4e3", size = 89863, upload-time = "2025-12-02T05:49:28.201Z" },
+    { url = "https://files.pythonhosted.org/packages/fc/2f/d22c52759209d2c44e4626d71c4b15ec35945af8cce609c4e04f84240c39/neologdn-0.5.6-cp314-cp314t-macosx_10_15_x86_64.whl", hash = "sha256:f02b27a703806fb593065b48ddfb3d93e48b5efa4c86ca2167300fd2a2a698c4", size = 50571, upload-time = "2025-12-02T05:49:29.203Z" },
+    { url = "https://files.pythonhosted.org/packages/af/78/8bc5114e32dd8f63c12bfc883aa562831cf9d5a6d4b2543fd87e22a8cca9/neologdn-0.5.6-cp314-cp314t-macosx_11_0_arm64.whl", hash = "sha256:c3bdbaa8494709665300b631d76541bf68b0b9983ebf91d4820edd41da880eb7", size = 49161, upload-time = "2025-12-02T05:49:30.281Z" },
+    { url = "https://files.pythonhosted.org/packages/1d/62/c9f4ff12154835b1900136734a22a6bdb69b80ddb8d3b42d16c1aaba5bd3/neologdn-0.5.6-cp314-cp314t-manylinux_2_24_aarch64.manylinux_2_28_aarch64.whl", hash = "sha256:87642a284ff190aa72127d4a4e4c6a02e1a830a1b0e6a8007dbd65055d012e1d", size = 311581, upload-time = "2025-12-02T05:49:31.343Z" },
+    { url = "https://files.pythonhosted.org/packages/7a/71/b5246f1855181a956f35a19bb92fcf20194ddaa74e2d200163df1705610e/neologdn-0.5.6-cp314-cp314t-manylinux_2_24_ppc64le.manylinux_2_28_ppc64le.whl", hash = "sha256:ba45a2a43fada92c201368ab195a5be530420c194bd1877f1e5b3373c19a89f3", size = 314030, upload-time = "2025-12-02T05:49:32.532Z" },
+    { url = "https://files.pythonhosted.org/packages/13/13/fe9e4684c3833b6d037d1e591c82ae3820d74ee1c51586990334c31a99c8/neologdn-0.5.6-cp314-cp314t-manylinux_2_24_s390x.manylinux_2_28_s390x.whl", hash = "sha256:60b0691d3a504b6f50cc597e8eb41d90de4c642884f4414cb0ddff732cc566ef", size = 315558, upload-time = "2025-12-02T05:49:33.766Z" },
+    { url = "https://files.pythonhosted.org/packages/9d/3f/b2891d21cae437d58cdd5a5609b69264a75c49f4fb42d38dd5277bdf31c3/neologdn-0.5.6-cp314-cp314t-manylinux_2_24_x86_64.manylinux_2_28_x86_64.whl", hash = "sha256:53fec94abeab5bda8082462fe7c986cd00766deb8d8568430331ab29574e4b62", size = 306956, upload-time = "2025-12-02T05:49:34.971Z" },
+    { url = "https://files.pythonhosted.org/packages/70/06/e04fc647261df6c1e490b25370c0f198d27d23ac46fb669f02c383860802/neologdn-0.5.6-cp314-cp314t-musllinux_1_2_aarch64.whl", hash = "sha256:2b2d9f05b1aa918cd6840476c3e6b9f1b19d29acfadbbcd338e536687ffd5331", size = 1281289, upload-time = "2025-12-02T05:49:36.18Z" },
+    { url = "https://files.pythonhosted.org/packages/d0/bf/b6bad21f16a936c66d12f415267d1d986352c75a73713071570955d0f59f/neologdn-0.5.6-cp314-cp314t-musllinux_1_2_ppc64le.whl", hash = "sha256:18f8fff008d47f13640545d89fdb05faa46e540c4a29017d129608b1f9f7ef00", size = 1363900, upload-time = "2025-12-02T05:49:37.496Z" },
+    { url = "https://files.pythonhosted.org/packages/36/5c/0e3074106f6d6ffb591d2bf93653c8713cdf7ab02bbb41dc450ce003ad0e/neologdn-0.5.6-cp314-cp314t-musllinux_1_2_s390x.whl", hash = "sha256:eb708b26a49e08fbf781169c1ce5f38141a2ab3edc98f209b54397ed51e6db03", size = 1475291, upload-time = "2025-12-02T05:49:38.975Z" },
+    { url = "https://files.pythonhosted.org/packages/8c/96/bd5dcdc97701f29b32320c9b87eca02fc790f5eeb36f074701db285c5111/neologdn-0.5.6-cp314-cp314t-musllinux_1_2_x86_64.whl", hash = "sha256:3ab7c99ebd8f5e765f90080b8d39de9e4578c210a84262fb4f428a1b3fb9fdd1", size = 1333281, upload-time = "2025-12-02T05:49:40.389Z" },
+    { url = "https://files.pythonhosted.org/packages/08/43/36781512b32a620934438cf4086ead2cf43cc01c64203fa3a6f498dd0b20/neologdn-0.5.6-cp314-cp314t-win32.whl", hash = "sha256:848d1d14e1feea7b619e688e7d727b6ad97be9039d81591a551e7c6ea9aa983a", size = 49112, upload-time = "2025-12-02T05:49:41.603Z" },
+    { url = "https://files.pythonhosted.org/packages/bc/74/4f99524e3784104fdc0660f38d4c8a8834a129194d80f962f22277f4745b/neologdn-0.5.6-cp314-cp314t-win_amd64.whl", hash = "sha256:67c8401fbc6f2a7462a719a42f9ad1979a8f7b2cd392eba91a82bc306063f15f", size = 52799, upload-time = "2025-12-02T05:49:43.103Z" },
+    { url = "https://files.pythonhosted.org/packages/59/33/e2d4fde79d50550874c93832afbc7a3787adfcde7e882666b9bb7ae5e51e/neologdn-0.5.6-cp314-cp314t-win_arm64.whl", hash = "sha256:37d82f9694cdfc062f6c050729c0dece3cfd26a57a23cde2a93c1b052e3c7c3f", size = 45755, upload-time = "2025-12-02T05:49:44.313Z" },
+]
+
+[[package]]
 name = "packaging"
 version = "26.0"
 source = { registry = "https://pypi.org/simple" }
@@ -117,6 +167,9 @@ wheels = [
 name = "yomail"
 version = "0.1.0"
 source = { editable = "." }
+dependencies = [
+    { name = "neologdn" },
+]
 
 [package.dev-dependencies]
 dev = [
@@ -126,6 +179,7 @@ dev = [
 ]
 
 [package.metadata]
+requires-dist = [{ name = "neologdn", specifier = ">=0.5.6" }]
 
 [package.metadata.requires-dev]
 dev = [

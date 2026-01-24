@@ -14,6 +14,13 @@ A lightweight, fast, and highly robust system to extract body text from Japanese
 
 **Check FEEDBACK.md** for open issues that need addressing.
 
+## Documentation Locations
+
+- **DESIGN.md** — Project root (system specification)
+- **PROGRESS.md** — `.internal/` (current status, session log)
+- **FEEDBACK.md** — `.internal/` (open issues)
+- **CLAUDE.local.md** — `.internal/` (this file, project instructions)
+
 ## Tech Stack
 
 - **Python**: 3.13+
@@ -92,7 +99,7 @@ yomail/
 
 ## Workflow
 
-- **Commit after each logical task** — Don't batch unrelated changes.
+- **Commit after each logical task** — Don't batch unrelated changes. Each feature or fix should be its own commit.
 - **Read before modifying** — Never propose changes to code you haven't read.
 
 ## Progress Tracking
