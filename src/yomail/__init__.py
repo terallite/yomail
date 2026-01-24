@@ -6,15 +6,24 @@ from yomail.exceptions import (
     LowConfidenceError,
     NoBodyDetectedError,
 )
-from yomail.pipeline import NormalizedEmail, Normalizer
+from yomail.pipeline import (
+    AnnotatedLine,
+    NormalizedEmail,
+    Normalizer,
+    StructuralAnalysis,
+    StructuralAnalyzer,
+)
 
 __version__ = "0.1.0"
 
 __all__ = [
+    "AnnotatedLine",
     "ExtractionError",
     "InvalidInputError",
     "LowConfidenceError",
     "NoBodyDetectedError",
     "NormalizedEmail",
     "Normalizer",
+    "StructuralAnalysis",
+    "StructuralAnalyzer",
 ]
