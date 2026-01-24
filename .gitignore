@@ -13,3 +13,4 @@ __pycache__/
 
 # Internal working docs (not checked in)
 .internal/
+CLAUDE.local.md
