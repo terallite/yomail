@@ -65,6 +65,9 @@ class Normalizer:
             text=text,
         )
 
+    # Dash-like characters for unification
+    _DASH_CHARS = frozenset("-ー")
+
     def _normalize_japanese(self, text: str) -> str:
         """Apply Japanese-specific normalization.
 
@@ -84,4 +87,34 @@ class Normalizer:
         # NFKC for remaining Unicode normalization
         text = unicodedata.normalize("NFKC", text)
 
+        # Unify dashes in delimiter-only lines
+        text = self._unify_delimiter_lines(text)
+
         return text
+
+    def _unify_delimiter_lines(self, text: str) -> str:
+        """Unify dash characters in lines that contain only dashes.
+
+        For lines consisting entirely of dash-like characters (- and ー),
+        normalize all dashes to the majority character in that line.
+        This preserves visual appearance while ensuring consistency.
+        """
+        lines = text.split("\n")
+        result = []
+
+        for line in lines:
+            stripped = line.strip()
+            if stripped and all(ch in self._DASH_CHARS for ch in stripped):
+                # Line is all dashes - unify to majority
+                count_hyphen = stripped.count("-")
+                count_prolonged = stripped.count("ー")
+                target = "-" if count_hyphen >= count_prolonged else "ー"
+                # Preserve leading/trailing whitespace
+                leading = line[: len(line) - len(line.lstrip())]
+                trailing = line[len(line.rstrip()) :]
+                unified = target * len(stripped)
+                result.append(leading + unified + trailing)
+            else:
+                result.append(line)
+
+        return "\n".join(result)
