@@ -121,7 +121,6 @@ Neural approaches require more data and risk overfitting to synthetic patterns. 
 - Normalize line endings to `\n`
 - Apply neologdn normalization (handles Japanese-specific normalization)
 - Apply Unicode NFKC normalization (as secondary pass)
-- Strip RFC 2822 headers if present (From:, To:, Subject:, Date:, etc.)
 - Preserve original line structure for downstream processing
 
 **neologdn normalization (via `neologdn.normalize()`):**
@@ -143,7 +142,6 @@ This dramatically simplifies downstream pattern matching — patterns only need 
 
 - Use charset detection library for encoding
 - Apply neologdn.normalize() first, then NFKC
-- Header detection should handle common variations (case insensitivity, spacing)
 - Preserve blank lines (structurally meaningful)
 
 ### 3.2 Structural Analyzer

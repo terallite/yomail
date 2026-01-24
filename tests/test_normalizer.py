@@ -15,7 +15,6 @@ class TestNormalizerBasic:
 
         assert result.lines == ("Hello", "World")
         assert result.text == "Hello\nWorld"
-        assert result.headers_stripped is False
 
     def test_crlf_normalization(self) -> None:
         """CRLF line endings are converted to LF."""
@@ -110,94 +109,6 @@ class TestJapaneseNormalization:
         result = normalizer.normalize("お世話になっております。")
 
         assert "お世話になっております" in result.text
-
-
-class TestHeaderStripping:
-    """RFC 2822 header stripping tests."""
-
-    def test_strips_basic_headers(self) -> None:
-        """Basic email headers are removed."""
-        normalizer = Normalizer()
-        text = """From: sender@example.com
-To: recipient@example.com
-Subject: Test
-
-This is the body."""
-        result = normalizer.normalize(text)
-
-        assert result.headers_stripped is True
-        assert "From:" not in result.text
-        assert "This is the body." in result.text
-
-    def test_strips_multiple_headers(self) -> None:
-        """Multiple headers including less common ones are removed."""
-        normalizer = Normalizer()
-        text = """From: sender@example.com
-To: recipient@example.com
-Cc: other@example.com
-Date: Mon, 1 Jan 2024 10:00:00 +0900
-Subject: Test
-X-Mailer: TestClient
-
-Body content here."""
-        result = normalizer.normalize(text)
-
-        assert result.headers_stripped is True
-        assert result.lines[0] == "Body content here."
-
-    def test_handles_folded_headers(self) -> None:
-        """Folded (continuation) headers are handled."""
-        normalizer = Normalizer()
-        text = """From: sender@example.com
-Subject: This is a very long subject
- that continues on the next line
-
-Body."""
-        result = normalizer.normalize(text)
-
-        assert result.headers_stripped is True
-        assert "Body." in result.text
-        assert "Subject:" not in result.text
-
-    def test_no_headers_returns_full_text(self) -> None:
-        """Text without headers is returned unchanged."""
-        normalizer = Normalizer()
-        text = "お世話になっております。\n\n本文です。"
-        result = normalizer.normalize(text)
-
-        assert result.headers_stripped is False
-        assert "お世話になっております。" in result.text
-
-    def test_colon_in_body_not_mistaken_for_header(self) -> None:
-        """Colons in body text are not mistaken for headers."""
-        normalizer = Normalizer()
-        text = "時間: 10時から\n場所: 会議室A"
-        result = normalizer.normalize(text)
-
-        assert result.headers_stripped is False
-        assert "時間:" in result.text
-
-    def test_header_stripping_can_be_disabled(self) -> None:
-        """Header stripping can be disabled."""
-        normalizer = Normalizer(strip_headers=False)
-        text = """From: sender@example.com
-
-Body."""
-        result = normalizer.normalize(text)
-
-        assert result.headers_stripped is False
-        assert "From:" in result.text
-
-    def test_headers_only_raises(self) -> None:
-        """Email with only headers and no body raises error."""
-        normalizer = Normalizer()
-        text = """From: sender@example.com
-To: recipient@example.com
-Subject: Empty body
-
-"""
-        with pytest.raises(InvalidInputError):
-            normalizer.normalize(text)
 
 
 class TestNormalizedEmailDataclass:
