@@ -14,3 +14,7 @@ __pycache__/
 # Internal working docs (not checked in)
 .internal/
 CLAUDE.local.md
+
+# Training data and models (too large for git)
+data/
+models/*.crfsuite

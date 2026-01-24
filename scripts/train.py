@@ -27,10 +27,10 @@ from yomail.pipeline.structural import StructuralAnalyzer
 def load_training_data(path: Path) -> list[dict]:
     """Load training data from JSONL file.
 
-    Expected format per line:
+    Expected format per line (yasumail format):
     {
         "email_text": "...",
-        "line_labels": [
+        "lines": [
             {"text": "line1", "label": "GREETING", "quote_depth": 0},
             {"text": "line2", "label": "BODY", "quote_depth": 0},
             ...
@@ -139,10 +139,11 @@ def main():
     for i, example in enumerate(examples):
         try:
             email_text = example["email_text"]
-            line_labels_raw = example["line_labels"]
+            # Support both "lines" (yasumail) and "line_labels" (legacy) format
+            lines_data = example.get("lines") or example.get("line_labels", [])
 
             # Extract labels
-            labels = validate_labels([item["label"] for item in line_labels_raw])
+            labels = validate_labels([item["label"] for item in lines_data])
 
             # Run through pipeline
             # Note: We use the raw texts, not the normalized ones,
