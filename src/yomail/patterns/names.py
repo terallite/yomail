@@ -6,26 +6,22 @@ Japanese personal names in email signatures.
 
 import re
 from functools import lru_cache
-from pathlib import Path
+from importlib import resources
 
 import yaml
 
 
 def _load_names_data() -> dict:
-    """Load names data from YAML file."""
-    # Try multiple locations for the data file
-    candidates = [
-        Path(__file__).parent.parent.parent.parent / "data" / "names.yaml",
-        Path("data/names.yaml"),
-    ]
-
-    for path in candidates:
-        if path.exists():
+    """Load names data from bundled YAML file."""
+    try:
+        data_files = resources.files("yomail.data")
+        names_file = data_files.joinpath("names.yaml")
+        with resources.as_file(names_file) as path:
             with open(path, encoding="utf-8") as f:
                 return yaml.safe_load(f)
-
-    # Return empty structure if file not found
-    return {"first_name": {"male": [], "female": []}, "last_name": []}
+    except (FileNotFoundError, TypeError):
+        # Return empty structure if file not found
+        return {"first_name": {"male": [], "female": []}, "last_name": []}
 
 
 @lru_cache(maxsize=1)

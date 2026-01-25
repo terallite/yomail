@@ -16,8 +16,11 @@ __pycache__/
 CLAUDE.local.md
 
 # Training data and models (too large for git)
-data/
-models/*.crfsuite
+/data/
+/models/*.crfsuite
+
+# But include bundled data in package
+!src/yomail/data/
 
 # Temporary files
 tmp/

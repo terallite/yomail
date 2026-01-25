@@ -82,7 +82,7 @@ class EmailBodyExtractor:
         """Initialize the extractor.
 
         Args:
-            model_path: Path to trained CRF model. Required for extraction.
+            model_path: Path to trained CRF model. If None, uses the bundled model.
             confidence_threshold: Minimum confidence to accept extraction.
         """
         # Pipeline components
@@ -90,7 +90,7 @@ class EmailBodyExtractor:
         self._content_filter = ContentFilter()
         self._structural_analyzer = StructuralAnalyzer()
         self._feature_extractor = FeatureExtractor()
-        self._crf_labeler = CRFSequenceLabeler(model_path)
+        self._crf_labeler = CRFSequenceLabeler(model_path, use_default=(model_path is None))
         self._reconstructor = Reconstructor()
         self._body_assembler = BodyAssembler()
 

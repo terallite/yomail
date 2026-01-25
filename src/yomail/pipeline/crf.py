@@ -11,6 +11,7 @@ Uses python-crfsuite to predict labels for each line of an email:
 
 import logging
 from dataclasses import dataclass
+from importlib import resources
 from pathlib import Path
 from typing import Literal
 
@@ -19,6 +20,25 @@ import pycrfsuite
 from yomail.pipeline.features import ExtractedFeatures, LineFeatures
 
 logger = logging.getLogger(__name__)
+
+
+def get_default_model_path() -> Path:
+    """Get path to the bundled default model.
+
+    Returns:
+        Path to the bundled email_body.crfsuite model.
+
+    Raises:
+        FileNotFoundError: If the bundled model is not found.
+    """
+    data_files = resources.files("yomail.data")
+    model_file = data_files.joinpath("email_body.crfsuite")
+    # Use as_file to get a concrete path (needed for pycrfsuite)
+    with resources.as_file(model_file) as path:
+        if not path.exists():
+            raise FileNotFoundError("Bundled model not found: email_body.crfsuite")
+        # Return a copy of the path since we're outside the context manager
+        return Path(path)
 
 
 # Label definitions
@@ -195,18 +215,23 @@ class CRFSequenceLabeler:
     with per-label marginal probabilities.
     """
 
-    def __init__(self, model_path: Path | str | None = None) -> None:
+    def __init__(self, model_path: Path | str | None = None, use_default: bool = True) -> None:
         """Initialize the CRF labeler.
 
         Args:
             model_path: Path to a trained CRF model file.
-                If None, the labeler must be loaded later with load_model().
+                If None and use_default is True, loads the bundled model.
+            use_default: If True and model_path is None, load the bundled model.
+                Set to False to create an unloaded labeler.
         """
         self._tagger: pycrfsuite.Tagger | None = None
         self._model_path: Path | None = None
+        self._resource_context = None  # Keep resource context alive
 
         if model_path is not None:
             self.load_model(model_path)
+        elif use_default:
+            self._load_default_model()
 
     def load_model(self, model_path: Path | str) -> None:
         """Load a trained CRF model.
@@ -231,6 +256,26 @@ class CRFSequenceLabeler:
 
         self._model_path = path
         logger.info("Loaded CRF model from %s", path)
+
+    def _load_default_model(self) -> None:
+        """Load the bundled default model."""
+        data_files = resources.files("yomail.data")
+        model_file = data_files.joinpath("email_body.crfsuite")
+        # Keep context manager alive for duration of object
+        self._resource_context = resources.as_file(model_file)
+        path = self._resource_context.__enter__()
+
+        self._tagger = pycrfsuite.Tagger()
+        try:
+            self._tagger.open(str(path))
+        except Exception as exc:
+            self._tagger = None
+            self._resource_context.__exit__(None, None, None)
+            self._resource_context = None
+            raise RuntimeError(f"Failed to load bundled CRF model: {exc}") from exc
+
+        self._model_path = path
+        logger.info("Loaded bundled CRF model")
 
     @property
     def is_loaded(self) -> bool:

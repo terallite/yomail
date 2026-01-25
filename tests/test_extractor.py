@@ -64,42 +64,32 @@ def _train_test_model(model_path: Path) -> None:
 class TestEmailBodyExtractor:
     """Tests for EmailBodyExtractor."""
 
-    def test_extract_without_model_raises(self) -> None:
-        """Extraction without model raises InvalidInputError."""
+    def test_default_model_loads(self) -> None:
+        """Default model loads automatically."""
         extractor = EmailBodyExtractor()
-
-        with pytest.raises(InvalidInputError, match="No CRF model loaded"):
-            extractor.extract("Hello world")
+        assert extractor.is_model_loaded is True
 
     def test_extract_empty_input_raises(self) -> None:
         """Empty input raises InvalidInputError."""
+        extractor = EmailBodyExtractor()
+
+        with pytest.raises(InvalidInputError):
+            extractor.extract("")
+
+    def test_extract_safe_returns_none_on_empty(self) -> None:
+        """extract_safe returns None on empty input."""
+        extractor = EmailBodyExtractor()
+
+        result = extractor.extract_safe("")
+        assert result is None
+
+    def test_custom_model_path(self) -> None:
+        """Custom model path can be specified."""
         with tempfile.TemporaryDirectory() as tmpdir:
             model_path = Path(tmpdir) / "test.crfsuite"
             _train_test_model(model_path)
 
             extractor = EmailBodyExtractor(model_path=model_path)
-
-            with pytest.raises(InvalidInputError):
-                extractor.extract("")
-
-    def test_extract_safe_returns_none_on_failure(self) -> None:
-        """extract_safe returns None on any failure."""
-        extractor = EmailBodyExtractor()
-
-        # No model loaded
-        result = extractor.extract_safe("Hello")
-        assert result is None
-
-    def test_is_model_loaded(self) -> None:
-        """is_model_loaded reflects state."""
-        extractor = EmailBodyExtractor()
-        assert extractor.is_model_loaded is False
-
-        with tempfile.TemporaryDirectory() as tmpdir:
-            model_path = Path(tmpdir) / "test.crfsuite"
-            _train_test_model(model_path)
-
-            extractor.load_model(model_path)
             assert extractor.is_model_loaded is True
 
 

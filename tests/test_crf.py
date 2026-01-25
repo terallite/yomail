@@ -192,7 +192,7 @@ class TestCRFSequenceLabeler:
 
     def test_not_loaded_raises(self) -> None:
         """Predict raises if no model loaded."""
-        labeler = CRFSequenceLabeler()
+        labeler = CRFSequenceLabeler(use_default=False)
         features = ExtractedFeatures(line_features=(), total_lines=0)
 
         with pytest.raises(RuntimeError, match="No CRF model loaded"):
@@ -200,12 +200,12 @@ class TestCRFSequenceLabeler:
 
     def test_is_loaded_property(self) -> None:
         """is_loaded reflects model state."""
-        labeler = CRFSequenceLabeler()
+        labeler = CRFSequenceLabeler(use_default=False)
         assert labeler.is_loaded is False
 
     def test_missing_model_file_raises(self) -> None:
         """Loading missing file raises FileNotFoundError."""
-        labeler = CRFSequenceLabeler()
+        labeler = CRFSequenceLabeler(use_default=False)
 
         with pytest.raises(FileNotFoundError):
             labeler.load_model("/nonexistent/model.crfsuite")
@@ -226,8 +226,13 @@ class TestCRFSequenceLabeler:
 
     def test_labels_property_default(self) -> None:
         """Labels property returns expected labels when no model loaded."""
-        labeler = CRFSequenceLabeler()
+        labeler = CRFSequenceLabeler(use_default=False)
         assert labeler.labels == LABELS
+
+    def test_default_model_loads(self) -> None:
+        """Default model loads automatically."""
+        labeler = CRFSequenceLabeler()
+        assert labeler.is_loaded is True
 
 
 class TestIntegrationWithModel:
