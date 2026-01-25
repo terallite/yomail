@@ -22,6 +22,39 @@ _VISUAL_SEPARATOR_PATTERNS: tuple[re.Pattern[str], ...] = (
     re.compile(r"^[-─━=_*~\s]{3,}$"),  # Mixed separators
 )
 
+# Separator characters for decorated separator detection
+_SEPARATOR_CHARS = frozenset("-─━=_*~")
+
+
+def _is_decorated_separator(line: str) -> bool:
+    """Check if a line is a decorated separator (e.g., ★-----★).
+
+    A decorated separator has:
+    - At least 3 separator characters (-=_*~ etc.)
+    - Separator chars make up at least 50% of the line
+    - Optional decorative characters at start/end
+
+    Args:
+        line: A stripped line of text.
+
+    Returns:
+        True if the line is a decorated separator.
+    """
+    if len(line) < 3:
+        return False
+
+    separator_count = sum(1 for c in line if c in _SEPARATOR_CHARS)
+
+    # Need at least 3 separator characters
+    if separator_count < 3:
+        return False
+
+    # Separator chars must be at least 50% of the line
+    if separator_count / len(line) < 0.5:
+        return False
+
+    return True
+
 # Contact information patterns
 _CONTACT_PATTERNS: tuple[re.Pattern[str], ...] = (
     # Phone patterns (after normalization, TEL/Tel are ASCII)
@@ -99,17 +132,24 @@ _POSITION_PATTERNS: tuple[re.Pattern[str], ...] = (
 def is_visual_separator_line(line: str) -> bool:
     """Check if a line is a visual separator.
 
+    Recognizes both pure separators (---, ===) and decorated separators (★-----★).
+
     Args:
         line: A single normalized line of text.
 
     Returns:
-        True if the line is a visual separator (---, ===, etc.).
+        True if the line is a visual separator.
     """
     stripped = line.strip()
     if not stripped:
         return False
 
-    return any(pattern.match(stripped) for pattern in _VISUAL_SEPARATOR_PATTERNS)
+    # Check pure separator patterns first
+    if any(pattern.match(stripped) for pattern in _VISUAL_SEPARATOR_PATTERNS):
+        return True
+
+    # Check decorated separators (e.g., ★-----★)
+    return _is_decorated_separator(stripped)
 
 
 def is_contact_info_line(line: str) -> bool:

@@ -2,6 +2,7 @@
 
 from yomail import FeatureExtractor, Normalizer, StructuralAnalyzer
 from yomail.pipeline.content_filter import ContentFilter
+from yomail.pipeline.features import _separators_match
 
 
 def _extract_features(text: str):
@@ -452,5 +453,129 @@ class TestSignaturePatterns:
         """Postal code patterns are detected."""
         result = _extract_features("〒100-0001")
         assert result.line_features[0].has_contact_info is True
+
+
+class TestSeparatorsMatch:
+    """Tests for the _separators_match helper function."""
+
+    def test_identical_separators_match(self) -> None:
+        """Identical separators should match."""
+        assert _separators_match("★----★", "★----★") is True
+        assert _separators_match("========", "========") is True
+        assert _separators_match("---", "---") is True
+
+    def test_length_within_one_matches(self) -> None:
+        """Separators with length difference of 1 should match."""
+        assert _separators_match("★----★", "★-----★") is True
+        assert _separators_match("-----", "------") is True
+        assert _separators_match("===", "====") is True
+
+    def test_same_char_distribution_matches(self) -> None:
+        """Separators with same character distribution should match."""
+        # Both have 5 dashes and 5 equals
+        assert _separators_match("-----=====", "--=-=-=-=-") is True
+        assert _separators_match("-=-=-=", "---===") is True
+
+    def test_different_distribution_no_match(self) -> None:
+        """Separators with different character distribution should not match."""
+        # One is dashes+equals, other is only equals
+        assert _separators_match("-=-=-=-=", "=========") is False
+
+    def test_different_characters_no_match(self) -> None:
+        """Separators with different characters should not match."""
+        assert _separators_match("========", "--------") is False
+        assert _separators_match("★★★★★", "◆◆◆◆◆") is False
+
+    def test_length_difference_too_large(self) -> None:
+        """Separators with length difference > 1 should not match."""
+        assert _separators_match("-----", "--------") is False
+        assert _separators_match("==", "=====") is False
+
+    def test_empty_separators(self) -> None:
+        """Empty separators should match."""
+        assert _separators_match("", "") is True
+
+    def test_single_char_separators(self) -> None:
+        """Single character separators should match correctly."""
+        assert _separators_match("-", "-") is True
+        assert _separators_match("-", "--") is True
+        assert _separators_match("-", "=") is False
+
+
+class TestBracketedSectionDetection:
+    """Tests for bracketed section detection."""
+
+    def test_simple_bracketed_section(self) -> None:
+        """Lines between matching separators are marked as bracketed."""
+        text = "Before\n========\nInside section\n========\nAfter"
+        result = _extract_features(text)
+
+        # Line indices: 0=Before, 1=======, 2=Inside, 3========, 4=After
+        assert result.line_features[0].in_bracketed_section is False  # Before
+        assert result.line_features[1].in_bracketed_section is False  # Separator
+        assert result.line_features[2].in_bracketed_section is True  # Inside
+        assert result.line_features[3].in_bracketed_section is False  # Separator
+        assert result.line_features[4].in_bracketed_section is False  # After
+
+    def test_signature_without_closing_separator(self) -> None:
+        """Lines after a single separator (no closer) are not bracketed."""
+        text = "Body text\n---\n山田太郎\nABC株式会社"
+        result = _extract_features(text)
+
+        # No closing separator, so nothing should be bracketed
+        for lf in result.line_features:
+            assert lf.in_bracketed_section is False
+
+    def test_bracketed_info_block_with_signature_patterns(self) -> None:
+        """Info block with contact info propagates signature pattern flag."""
+        text = "★---------------------★\n【添付ファイルについて】\nhttps://example.com/mypage\n★---------------------★"
+        result = _extract_features(text)
+
+        # Lines 1 and 2 are inside brackets
+        assert result.line_features[1].in_bracketed_section is True
+        assert result.line_features[2].in_bracketed_section is True
+        # URL is contact info, so bracket_has_signature_patterns should be True
+        assert result.line_features[1].bracket_has_signature_patterns is True
+        assert result.line_features[2].bracket_has_signature_patterns is True
+
+    def test_bracketed_section_without_signature_patterns(self) -> None:
+        """Info block without signature patterns has flag as False."""
+        text = "========\n会議の詳細\n日時：明日10時\n========"
+        result = _extract_features(text)
+
+        # Lines inside brackets
+        inside_lines = [lf for lf in result.line_features if lf.in_bracketed_section]
+        assert len(inside_lines) >= 1
+        # No signature patterns (no contact info, company, or name patterns)
+        for lf in inside_lines:
+            assert lf.bracket_has_signature_patterns is False
+
+    def test_multiple_bracketed_sections(self) -> None:
+        """Multiple distinct bracketed sections are detected."""
+        text = "---\nFirst block\n---\nMiddle\n===\nSecond block\n==="
+        result = _extract_features(text)
+
+        # First block lines
+        assert result.line_features[1].in_bracketed_section is True  # First block
+        # Middle is not bracketed
+        assert result.line_features[3].in_bracketed_section is False  # Middle
+        # Second block lines
+        assert result.line_features[5].in_bracketed_section is True  # Second block
+
+    def test_similar_separators_match_for_brackets(self) -> None:
+        """Separators with similar character distribution form brackets."""
+        text = "-----=====\nContent here\n--=-=-=-=-"
+        result = _extract_features(text)
+
+        # Content should be bracketed (separators have same char distribution)
+        assert result.line_features[1].in_bracketed_section is True
+
+    def test_dissimilar_separators_no_bracket(self) -> None:
+        """Dissimilar separators do not form brackets."""
+        text = "========\nContent here\n--------"
+        result = _extract_features(text)
+
+        # Content should NOT be bracketed (different characters)
+        assert result.line_features[1].in_bracketed_section is False
 
 

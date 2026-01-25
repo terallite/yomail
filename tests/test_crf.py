@@ -56,6 +56,8 @@ def _make_line_features(
     context_contact_count: int = 0,
     context_quote_count: int = 0,
     context_separator_count: int = 0,
+    in_bracketed_section: bool = False,
+    bracket_has_signature_patterns: bool = False,
 ) -> LineFeatures:
     """Create a LineFeatures with sensible defaults."""
     return LineFeatures(
@@ -94,6 +96,8 @@ def _make_line_features(
         context_contact_count=context_contact_count,
         context_quote_count=context_quote_count,
         context_separator_count=context_separator_count,
+        in_bracketed_section=in_bracketed_section,
+        bracket_has_signature_patterns=bracket_has_signature_patterns,
     )
 
 

@@ -154,6 +154,16 @@ def _features_to_dict(features: LineFeatures, idx: int, total_lines: int) -> dic
     else:
         feat["char_type"] = "mixed"
 
+    # Bracket features
+    feat["in_bracketed_section"] = features.in_bracketed_section
+    feat["bracket_has_signature_patterns"] = features.bracket_has_signature_patterns
+
+    # Derived categorical for brackets
+    if features.in_bracketed_section:
+        feat["bracket_cat"] = "bracketed"
+    else:
+        feat["bracket_cat"] = "unbracketed"
+
     return feat
 
 

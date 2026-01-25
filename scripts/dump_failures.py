@@ -90,13 +90,17 @@ def main():
         examples = [json.loads(line) for line in f]
     print(f"Loaded {len(examples)} examples")
 
-    # Find confident wrong examples
+    # Find confident wrong examples (confidence >= threshold but wrong result)
+    confidence_threshold = 0.5
     print("Finding confident wrong examples...")
     confident_wrong = []
     for i, ex in enumerate(examples):
         try:
             result = extractor.extract_with_metadata(ex["email_text"])
             if result is None or result.body is None:
+                continue
+            # Only count as "confident wrong" if above threshold
+            if result.confidence < confidence_threshold:
                 continue
             expected = get_expected_body(ex)
             extracted_norm = normalize_text(result.body)

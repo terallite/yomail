@@ -12,8 +12,9 @@ from __future__ import annotations
 
 import re
 import unicodedata
+from collections import Counter
 from dataclasses import dataclass
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Sequence
 
 from yomail.patterns.closings import is_closing_line
 from yomail.patterns.greetings import is_greeting_line
@@ -85,6 +86,10 @@ class LineFeatures:
     context_quote_count: int
     context_separator_count: int
 
+    # Bracket features
+    in_bracketed_section: bool
+    bracket_has_signature_patterns: bool  # Propagated: any line in bracket has sig patterns
+
 
 @dataclass(frozen=True, slots=True)
 class ExtractedFeatures:
@@ -122,6 +127,135 @@ _QUOTATION_PAIRS = (
 )
 
 
+def _separators_match(a: str, b: str) -> bool:
+    """Check if two separators are similar enough to form a bracket pair.
+
+    Similarity means:
+    - Length within 1 character
+    - Same character distribution (each char count within 1)
+    """
+    # Length must be within 1 character
+    if abs(len(a) - len(b)) > 1:
+        return False
+
+    # Compare character frequency distributions
+    counts_a = Counter(a)
+    counts_b = Counter(b)
+
+    # Must have same character set
+    if counts_a.keys() != counts_b.keys():
+        return False
+
+    # Each character count must be within 1
+    for char in counts_a:
+        if abs(counts_a[char] - counts_b[char]) > 1:
+            return False
+
+    return True
+
+
+def _find_bracketed_sections(
+    lines: Sequence[AnnotatedLine],
+    flags: Sequence[dict[str, bool]],
+) -> tuple[set[int], dict[int, tuple[int, int]]]:
+    """Find lines inside bracketed sections.
+
+    A bracketed section is a block of content surrounded by similar visual
+    separators. This helps distinguish info blocks (BODY) from signatures
+    (SIGNATURE) - info blocks have matching closing separators, signatures don't.
+
+    Args:
+        lines: Sequence of AnnotatedLine from structural analysis.
+        flags: Sequence of pattern flag dicts (one per line).
+
+    Returns:
+        Tuple of:
+        - Set of line indices that are inside bracketed sections
+        - Dict mapping line index to (bracket_start, bracket_end) indices
+    """
+    bracketed: set[int] = set()
+    bracket_ranges: dict[int, tuple[int, int]] = {}
+
+    # Find all separator positions (using is_visual_separator from flags or is_delimiter)
+    separator_indices = [
+        i
+        for i, f in enumerate(flags)
+        if f["is_visual_separator"] or lines[i].is_delimiter
+    ]
+
+    # For each separator, look for a matching closer
+    used_as_closer: set[int] = set()
+
+    for i, open_idx in enumerate(separator_indices):
+        if open_idx in used_as_closer:
+            continue
+
+        open_text = lines[open_idx].text.strip()
+
+        # Look for a matching closer
+        for close_idx in separator_indices[i + 1 :]:
+            if close_idx in used_as_closer:
+                continue
+
+            # Require at least 1 content line between brackets
+            if close_idx <= open_idx + 1:
+                continue
+
+            close_text = lines[close_idx].text.strip()
+
+            if _separators_match(open_text, close_text):
+                # Mark all lines between as bracketed
+                for idx in range(open_idx + 1, close_idx):
+                    bracketed.add(idx)
+                    bracket_ranges[idx] = (open_idx, close_idx)
+                used_as_closer.add(close_idx)
+                break
+
+    return bracketed, bracket_ranges
+
+
+def _aggregate_bracket_features(
+    bracket_ranges: dict[int, tuple[int, int]],
+    flags: Sequence[dict[str, bool]],
+) -> dict[int, dict[str, bool]]:
+    """Aggregate signature-like features across each bracketed section.
+
+    For each line inside a bracket, compute whether ANY line in that bracket
+    has signature-like patterns (contact info, company name, person name).
+
+    Args:
+        bracket_ranges: Dict mapping line index to (start, end) bracket indices.
+        flags: Sequence of pattern flag dicts (one per line).
+
+    Returns:
+        Dict mapping line index to aggregated bracket features.
+    """
+    aggregated: dict[int, dict[str, bool]] = {}
+
+    # Group by bracket range
+    range_to_indices: dict[tuple[int, int], list[int]] = {}
+    for idx, bracket_range in bracket_ranges.items():
+        range_to_indices.setdefault(bracket_range, []).append(idx)
+
+    # For each bracket, aggregate features
+    for (start, end), indices in range_to_indices.items():
+        # Check if any line in bracket has signature patterns
+        has_sig_patterns = any(
+            flags[i]["has_contact_info"]
+            or flags[i]["has_company_pattern"]
+            or flags[i]["has_name_pattern"]
+            for i in range(start + 1, end)
+        )
+
+        # Propagate to all lines in bracket
+        for idx in indices:
+            aggregated[idx] = {
+                "bracket_has_signature_patterns": has_sig_patterns,
+            }
+
+    return aggregated
+
+
 class FeatureExtractor:
     """Extracts features from content-only email text.
 
@@ -154,11 +288,19 @@ class FeatureExtractor:
         # Pre-compute per-line pattern flags for contextual features
         line_flags = [self._compute_pattern_flags(line) for line in lines]
 
+        # Detect bracketed sections (late pass)
+        bracketed_indices, bracket_ranges = _find_bracketed_sections(lines, line_flags)
+        bracket_features = _aggregate_bracket_features(bracket_ranges, line_flags)
+
         # Build feature vectors
         feature_list: list[LineFeatures] = []
 
         for idx, annotated_line in enumerate(lines):
             content_line = content_lines[idx]
+
+            # Get bracket info for this line
+            is_bracketed = idx in bracketed_indices
+            bracket_agg = bracket_features.get(idx, {})
 
             features = self._extract_line_features(
                 annotated_line=annotated_line,
@@ -170,6 +312,10 @@ class FeatureExtractor:
                 all_flags=line_flags,
                 blank_lines_before=content_line.blank_lines_before,
                 blank_lines_after=content_line.blank_lines_after,
+                in_bracketed_section=is_bracketed,
+                bracket_has_signature_patterns=bracket_agg.get(
+                    "bracket_has_signature_patterns", False
+                ),
             )
             feature_list.append(features)
 
@@ -189,6 +335,8 @@ class FeatureExtractor:
         all_flags: list[dict[str, bool]],
         blank_lines_before: int,
         blank_lines_after: int,
+        in_bracketed_section: bool,
+        bracket_has_signature_patterns: bool,
     ) -> LineFeatures:
         """Extract features for a single content line."""
         text = annotated_line.text
@@ -264,6 +412,9 @@ class FeatureExtractor:
             context_contact_count=context["contact_count"],
             context_quote_count=context["quote_count"],
             context_separator_count=context["separator_count"],
+            # Bracket features
+            in_bracketed_section=in_bracketed_section,
+            bracket_has_signature_patterns=bracket_has_signature_patterns,
         )
 
     def _compute_pattern_flags(self, annotated_line: AnnotatedLine) -> dict[str, bool]:
