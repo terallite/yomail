@@ -244,7 +244,9 @@ class CRFSequenceLabeler:
             return LABELS
         return tuple(self._tagger.labels())
 
-    def _fix_impossible_transitions(self, labels: list[str]) -> list[str]:
+    def _fix_impossible_transitions(
+        self, labels: list[str], extracted: ExtractedFeatures
+    ) -> list[str]:
         """Fix impossible label transitions that the CRF may produce.
 
         The CRF can predict impossible transitions like SIGNATURE → CLOSING
@@ -253,7 +255,7 @@ class CRFSequenceLabeler:
 
         Rules:
         - SIGNATURE → CLOSING is impossible (relabel CLOSING as SIGNATURE)
-        - SIGNATURE → BODY after signature started is suspicious (relabel as SIGNATURE)
+        - Separator lines (is_delimiter or is_visual_separator) cannot be CLOSING
         """
         if len(labels) < 2:
             return labels
@@ -262,6 +264,24 @@ class CRFSequenceLabeler:
         in_signature = False
 
         for i in range(len(fixed)):
+            line_features = extracted.line_features[i]
+
+            # Rule: Separator lines cannot be CLOSING
+            # They should inherit from context (SIGNATURE if after body, BODY if in info block)
+            if fixed[i] == "CLOSING" and (
+                line_features.is_delimiter or line_features.is_visual_separator
+            ):
+                # Look ahead to determine context
+                if i + 1 < len(fixed) and fixed[i + 1] == "SIGNATURE":
+                    fixed[i] = "SIGNATURE"
+                else:
+                    fixed[i] = "BODY"
+                logger.debug(
+                    "Fixed separator line labeled CLOSING → %s at position %d",
+                    fixed[i],
+                    i,
+                )
+
             if fixed[i] == "SIGNATURE":
                 in_signature = True
             elif in_signature:
@@ -270,10 +290,6 @@ class CRFSequenceLabeler:
                     # SIGNATURE → CLOSING is impossible
                     fixed[i] = "SIGNATURE"
                     logger.debug("Fixed impossible SIGNATURE → CLOSING at position %d", i)
-                elif fixed[i] in ("GREETING", "BODY"):
-                    # SIGNATURE → GREETING/BODY likely means the "signature" was actually body
-                    # Don't fix here - could be legitimate edge case
-                    pass
 
         return fixed
 
@@ -312,8 +328,8 @@ class CRFSequenceLabeler:
         # Get predicted labels
         predicted_labels = self._tagger.tag()
 
-        # Fix impossible transitions (SIGNATURE → CLOSING is not allowed)
-        predicted_labels = self._fix_impossible_transitions(predicted_labels)
+        # Fix impossible transitions
+        predicted_labels = self._fix_impossible_transitions(predicted_labels, extracted)
 
         # Get sequence probability (probability of the predicted sequence)
         sequence_prob = self._tagger.probability(predicted_labels)
