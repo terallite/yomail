@@ -5,13 +5,18 @@ Patterns match against neologdn-normalized text.
 
 import re
 
+# Sentence-ending punctuation (formal and informal)
+# Includes: period (。.), exclamation (!！), tilde (〜~)
+_PUNCT = r"[。.!！〜~]"
+
 # Closing patterns - common Japanese email closing formulas
 _CLOSING_PATTERNS: tuple[re.Pattern[str], ...] = (
     # Most common business closings
-    re.compile(r"^.*よろしくお願い(いた|致)します[。.]?$"),
-    re.compile(r"^.*よろしくお願い申し上げます[。.]?$"),
-    re.compile(r"^.*よろしくお願いします[。.]?$"),
-    re.compile(r"^以上[、,]?.*よろしくお願い.*$"),
+    re.compile(rf"^.*よろしくお願い(いた|致)します{_PUNCT}?$"),
+    re.compile(rf"^.*よろしくお願い申し上げます{_PUNCT}?$"),
+    re.compile(rf"^.*よろしくお願いします{_PUNCT}?$"),
+    # 以上 (that's all) followed by any polite request
+    re.compile(r"^以上[、,､].*(お願い|ください|下さい).*$"),
     re.compile(r"^.*何卒よろしくお願い.*$"),
     re.compile(r"^.*どうぞよろしくお願い.*$"),
     re.compile(r"^.*引き続きよろしくお願い.*$"),
@@ -25,24 +30,24 @@ _CLOSING_PATTERNS: tuple[re.Pattern[str], ...] = (
     re.compile(r"^.*お手数ですが.*$"),
     re.compile(r"^.*ご面倒をおかけしますが.*$"),
     # Formal letter closings
-    re.compile(r"^敬具[。.]?$"),
-    re.compile(r"^草々[。.]?$"),
-    re.compile(r"^敬白[。.]?$"),
-    re.compile(r"^謹白[。.]?$"),
-    re.compile(r"^早々[。.]?$"),
+    re.compile(rf"^敬具{_PUNCT}?$"),
+    re.compile(rf"^草々{_PUNCT}?$"),
+    re.compile(rf"^敬白{_PUNCT}?$"),
+    re.compile(rf"^謹白{_PUNCT}?$"),
+    re.compile(rf"^早々{_PUNCT}?$"),
     # 以上 (that's all) - often ends body
-    re.compile(r"^以上です[。.]?$"),
-    re.compile(r"^以上となります[。.]?$"),
-    re.compile(r"^以上[。.]?$"),
+    re.compile(rf"^以上です{_PUNCT}?$"),
+    re.compile(rf"^以上となります{_PUNCT}?$"),
+    re.compile(rf"^以上{_PUNCT}?$"),
     # Waiting for reply
     re.compile(r"^.*ご返信.*お待ち.*$"),
     re.compile(r"^.*お返事.*お待ち.*$"),
     # Thanks in advance
-    re.compile(r"^.*ありがとうございます[。.]?$"),
-    re.compile(r"^.*ありがとうございました[。.]?$"),
+    re.compile(rf"^.*ありがとうございます{_PUNCT}?$"),
+    re.compile(rf"^.*ありがとうございました{_PUNCT}?$"),
     # Take care
-    re.compile(r"^.*失礼いたします[。.]?$"),
-    re.compile(r"^.*失礼します[。.]?$"),
+    re.compile(rf"^.*失礼いたします{_PUNCT}?$"),
+    re.compile(rf"^.*失礼します{_PUNCT}?$"),
 )
 
 
