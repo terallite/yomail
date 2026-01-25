@@ -1,40 +1,41 @@
 """Tests for the Body Assembler component."""
 
+from typing import cast
+
 from yomail.pipeline.assembler import BodyAssembler
-from yomail.pipeline.crf import Label, LabeledLine, SequenceLabelingResult
+from yomail.pipeline.crf import Label
+from yomail.pipeline.reconstructor import ReconstructedDocument, ReconstructedLine
 
 
-def _make_labeled_line(
+def _make_reconstructed_line(
     text: str,
     label: Label,
+    original_index: int,
+    is_blank: bool = False,
     confidence: float = 0.9,
-) -> LabeledLine:
-    """Create a LabeledLine with default probabilities."""
-    # Simple probability distribution - label gets the confidence, others get the rest
-    other_prob = (1.0 - confidence) / 5.0
-    probs: dict[Label, float] = {
-        "GREETING": other_prob,
-        "BODY": other_prob,
-        "CLOSING": other_prob,
-        "SIGNATURE": other_prob,
-        "QUOTE": other_prob,
-        "OTHER": other_prob,
-    }
-    probs[label] = confidence
-
-    return LabeledLine(
+) -> ReconstructedLine:
+    """Create a ReconstructedLine with default values."""
+    return ReconstructedLine(
         text=text,
+        original_index=original_index,
+        is_blank=is_blank,
         label=label,
-        confidence=confidence,
-        label_probabilities=probs,
+        confidence=confidence if not is_blank else None,
+        label_probabilities=None,
     )
 
 
-def _make_result(lines: list[tuple[str, Label]]) -> SequenceLabelingResult:
-    """Create a SequenceLabelingResult from (text, label) pairs."""
-    labeled = tuple(_make_labeled_line(text, label) for text, label in lines)
-    return SequenceLabelingResult(
-        labeled_lines=labeled,
+def _make_doc(lines: list[tuple[str, Label]]) -> ReconstructedDocument:
+    """Create a ReconstructedDocument from (text, label) pairs.
+
+    All lines are treated as content (non-blank) lines.
+    """
+    reconstructed_lines: list[ReconstructedLine] = []
+    for idx, line_tuple in enumerate(lines):
+        text, label = line_tuple
+        reconstructed_lines.append(_make_reconstructed_line(text, cast(Label, label), idx))
+    return ReconstructedDocument(
+        lines=tuple(reconstructed_lines),
         sequence_probability=0.9,
     )
 
@@ -44,7 +45,7 @@ class TestSignatureBoundary:
 
     def test_no_signature(self) -> None:
         """No signature means all content considered."""
-        result = _make_result([
+        result = _make_doc([
             ("Hello", "BODY"),
             ("World", "BODY"),
         ])
@@ -56,7 +57,7 @@ class TestSignatureBoundary:
 
     def test_signature_at_end(self) -> None:
         """Signature at end excludes signature lines."""
-        result = _make_result([
+        result = _make_doc([
             ("Hello", "BODY"),
             ("---", "OTHER"),
             ("John Doe", "SIGNATURE"),
@@ -71,7 +72,7 @@ class TestSignatureBoundary:
 
     def test_signature_excludes_all_after(self) -> None:
         """Everything after first SIGNATURE is excluded."""
-        result = _make_result([
+        result = _make_doc([
             ("Body line", "BODY"),
             ("Sig start", "SIGNATURE"),
             ("More body", "BODY"),  # This should be excluded
@@ -88,7 +89,7 @@ class TestInlineQuotes:
 
     def test_inline_quote_included(self) -> None:
         """Quotes between BODY lines are inline and included."""
-        result = _make_result([
+        result = _make_doc([
             ("Before quote", "BODY"),
             ("> Quoted text", "QUOTE"),
             ("After quote", "BODY"),
@@ -101,7 +102,7 @@ class TestInlineQuotes:
 
     def test_trailing_quote_excluded(self) -> None:
         """Quotes at end (no BODY after) are excluded."""
-        result = _make_result([
+        result = _make_doc([
             ("Body text", "BODY"),
             ("> Old message", "QUOTE"),
             ("> More old", "QUOTE"),
@@ -114,7 +115,7 @@ class TestInlineQuotes:
 
     def test_leading_quote_excluded(self) -> None:
         """Quotes at start (no BODY before) are excluded."""
-        result = _make_result([
+        result = _make_doc([
             ("> Previous email", "QUOTE"),
             ("My reply", "BODY"),
         ])
@@ -130,7 +131,7 @@ class TestContentBlocks:
 
     def test_body_lines_accumulate(self) -> None:
         """Consecutive BODY lines form one block."""
-        result = _make_result([
+        result = _make_doc([
             ("Line 1", "BODY"),
             ("Line 2", "BODY"),
             ("Line 3", "BODY"),
@@ -142,7 +143,7 @@ class TestContentBlocks:
 
     def test_other_included_if_followed_by_body(self) -> None:
         """OTHER lines are included when between BODY lines."""
-        result = _make_result([
+        result = _make_doc([
             ("Paragraph 1", "BODY"),
             ("[some header noise]", "OTHER"),
             ("Paragraph 2", "BODY"),
@@ -154,7 +155,7 @@ class TestContentBlocks:
 
     def test_trailing_other_excluded(self) -> None:
         """OTHER lines at end are not included."""
-        result = _make_result([
+        result = _make_doc([
             ("Content", "BODY"),
             ("[noise 1]", "OTHER"),
             ("[noise 2]", "OTHER"),
@@ -166,7 +167,7 @@ class TestContentBlocks:
 
     def test_greeting_included_when_adjacent_to_body(self) -> None:
         """GREETING lines are included in the block."""
-        result = _make_result([
+        result = _make_doc([
             ("Dear Sir", "GREETING"),
             ("Please find attached", "BODY"),
         ])
@@ -177,7 +178,7 @@ class TestContentBlocks:
 
     def test_closing_included_when_adjacent_to_body(self) -> None:
         """CLOSING lines are included in the block."""
-        result = _make_result([
+        result = _make_doc([
             ("The attachment is ready", "BODY"),
             ("Best regards", "CLOSING"),
         ])
@@ -188,7 +189,7 @@ class TestContentBlocks:
 
     def test_other_is_neutral(self) -> None:
         """OTHER lines are neutral and don't break blocks."""
-        result = _make_result([
+        result = _make_doc([
             ("Block 1 line 1", "BODY"),
             ("Block 1 line 2", "BODY"),
             ("Blank line", "OTHER"),
@@ -204,12 +205,46 @@ class TestContentBlocks:
         assert "Blank line" in assembled.body_text
 
 
+class TestBlankLineHandling:
+    """Tests for blank line handling in body assembly."""
+
+    def test_blank_lines_between_body_included(self) -> None:
+        """Blank lines between body content are included in output."""
+        lines = [
+            _make_reconstructed_line("Para 1", "BODY", 0),
+            _make_reconstructed_line("", "BODY", 1, is_blank=True),  # inherits BODY
+            _make_reconstructed_line("Para 2", "BODY", 2),
+        ]
+        doc = ReconstructedDocument(lines=tuple(lines), sequence_probability=0.9)
+        assembler = BodyAssembler()
+        assembled = assembler.assemble(doc)
+
+        # Blank line should be included in output
+        assert assembled.body_text == "Para 1\n\nPara 2"
+        assert assembled.body_lines == (0, 1, 2)
+
+    def test_trailing_blank_lines_excluded(self) -> None:
+        """Blank lines at the end of body are excluded."""
+        lines = [
+            _make_reconstructed_line("Content", "BODY", 0),
+            _make_reconstructed_line("", "BODY", 1, is_blank=True),
+            _make_reconstructed_line("", "BODY", 2, is_blank=True),
+        ]
+        doc = ReconstructedDocument(lines=tuple(lines), sequence_probability=0.9)
+        assembler = BodyAssembler()
+        assembled = assembler.assemble(doc)
+
+        # Trailing blanks are not included (no content after them)
+        assert assembled.body_text == "Content"
+        assert assembled.body_lines == (0,)
+
+
 class TestBodySelection:
     """Tests for final body selection logic."""
 
     def test_with_signature_concatenates_all_blocks(self) -> None:
         """With signature, all blocks before signature are concatenated."""
-        result = _make_result([
+        result = _make_doc([
             ("Block 1", "BODY"),
             ("Noise", "OTHER"),
             ("Block 2", "BODY"),
@@ -224,7 +259,7 @@ class TestBodySelection:
 
     def test_without_signature_selects_longest_block(self) -> None:
         """Without signature, longest block is selected (blocks split by leading quote)."""
-        result = _make_result([
+        result = _make_doc([
             ("> leading quote", "QUOTE"),  # Leading quote - creates first empty block
             ("Body line 1", "BODY"),
             ("Body line 2", "BODY"),
@@ -239,7 +274,7 @@ class TestBodySelection:
 
     def test_without_signature_all_content_in_one_block(self) -> None:
         """Without signature or quotes, all content flows into one block."""
-        result = _make_result([
+        result = _make_doc([
             ("Greeting", "GREETING"),
             ("", "OTHER"),
             ("Body content", "BODY"),
@@ -260,12 +295,12 @@ class TestEmptyInput:
 
     def test_empty_result(self) -> None:
         """Empty input returns empty body."""
-        result = SequenceLabelingResult(
-            labeled_lines=(),
+        doc = ReconstructedDocument(
+            lines=(),
             sequence_probability=1.0,
         )
         assembler = BodyAssembler()
-        assembled = assembler.assemble(result)
+        assembled = assembler.assemble(doc)
 
         assert assembled.body_text == ""
         assert assembled.success is False
@@ -273,7 +308,7 @@ class TestEmptyInput:
 
     def test_only_signature(self) -> None:
         """Only signature lines means no body."""
-        result = _make_result([
+        result = _make_doc([
             ("John Doe", "SIGNATURE"),
             ("john@example.com", "SIGNATURE"),
         ])
@@ -285,7 +320,7 @@ class TestEmptyInput:
 
     def test_only_quotes(self) -> None:
         """Only quotes (no body) means no body extracted."""
-        result = _make_result([
+        result = _make_doc([
             ("> Old message", "QUOTE"),
             ("> More old", "QUOTE"),
         ])

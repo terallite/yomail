@@ -1,6 +1,7 @@
 """Body Assembler for extracting the final email body from labeled lines.
 
-Takes CRF-labeled lines and assembles them into the final body text:
+Takes CRF-labeled lines (via ReconstructedDocument) and assembles them
+into the final body text:
 - Finds signature boundary and excludes content after it
 - Classifies quotes as inline vs trailing/leading
 - Builds content blocks with merging logic
@@ -10,7 +11,7 @@ Takes CRF-labeled lines and assembles them into the final body text:
 import logging
 from dataclasses import dataclass
 
-from yomail.pipeline.crf import LabeledLine, SequenceLabelingResult
+from yomail.pipeline.reconstructor import ReconstructedDocument, ReconstructedLine
 
 logger = logging.getLogger(__name__)
 
@@ -45,18 +46,18 @@ class BodyAssembler:
     5. Assemble text
     """
 
-    def assemble(self, labeling_result: SequenceLabelingResult) -> AssembledBody:
+    def assemble(self, doc: ReconstructedDocument) -> AssembledBody:
         """Assemble body text from labeled lines.
 
         Args:
-            labeling_result: Output from CRFSequenceLabeler.
+            doc: ReconstructedDocument with all lines (content + blank) labeled.
 
         Returns:
             AssembledBody with extracted text and metadata.
         """
-        labeled_lines = labeling_result.labeled_lines
+        lines = doc.lines
 
-        if not labeled_lines:
+        if not lines:
             return AssembledBody(
                 body_text="",
                 body_lines=(),
@@ -66,19 +67,19 @@ class BodyAssembler:
             )
 
         # Step 1: Find signature boundary
-        signature_index = self._find_signature_boundary(labeled_lines)
+        signature_index = self._find_signature_boundary(lines)
 
         # Step 2: Identify inline vs trailing/leading quotes
-        inline_quote_indices = self._find_inline_quotes(labeled_lines, signature_index)
+        inline_quote_indices = self._find_inline_quotes(lines, signature_index)
 
         # Step 3: Build content blocks
-        blocks = self._build_content_blocks(labeled_lines, signature_index, inline_quote_indices)
+        blocks = self._build_content_blocks(lines, signature_index, inline_quote_indices)
 
         # Step 4: Select final body
         selected_indices = self._select_body(blocks, signature_index)
 
         # Step 5: Assemble text
-        body_text = self._assemble_text(labeled_lines, selected_indices)
+        body_text = self._assemble_text(lines, selected_indices)
 
         # Count inline quotes in selected body
         inline_quote_count = sum(1 for idx in selected_indices if idx in inline_quote_indices)
@@ -91,25 +92,26 @@ class BodyAssembler:
             success=len(body_text.strip()) > 0,
         )
 
-    def _find_signature_boundary(self, labeled_lines: tuple[LabeledLine, ...]) -> int | None:
-        """Find the index of the first SIGNATURE line.
+    def _find_signature_boundary(self, lines: tuple[ReconstructedLine, ...]) -> int | None:
+        """Find the index of the first SIGNATURE line (content line only).
 
         All content from this line onward is excluded from body consideration.
 
         Args:
-            labeled_lines: Sequence of labeled lines.
+            lines: Sequence of reconstructed lines.
 
         Returns:
-            Index of first SIGNATURE line, or None if no signature found.
+            Index of first non-blank SIGNATURE line, or None if no signature found.
         """
-        for idx, line in enumerate(labeled_lines):
-            if line.label == "SIGNATURE":
+        for idx, line in enumerate(lines):
+            # Only count content (non-blank) lines as signature boundary
+            if not line.is_blank and line.label == "SIGNATURE":
                 return idx
         return None
 
     def _find_inline_quotes(
         self,
-        labeled_lines: tuple[LabeledLine, ...],
+        lines: tuple[ReconstructedLine, ...],
         signature_index: int | None,
     ) -> set[int]:
         """Find indices of inline quote lines.
@@ -120,20 +122,21 @@ class BodyAssembler:
         (after all content) are considered leading/trailing.
 
         Args:
-            labeled_lines: Sequence of labeled lines.
+            lines: Sequence of reconstructed lines.
             signature_index: Index of signature boundary, or None.
 
         Returns:
             Set of indices for inline quote lines.
         """
         # Determine the range to consider (up to but not including signature)
-        end_index = signature_index if signature_index is not None else len(labeled_lines)
+        end_index = signature_index if signature_index is not None else len(lines)
 
-        # Find all content line indices (GREETING, BODY, CLOSING)
+        # Find all content line indices (GREETING, BODY, CLOSING) - non-blank only
         content_labels = {"GREETING", "BODY", "CLOSING"}
         content_indices: list[int] = []
         for idx in range(end_index):
-            if labeled_lines[idx].label in content_labels:
+            line = lines[idx]
+            if not line.is_blank and line.label in content_labels:
                 content_indices.append(idx)
 
         if len(content_indices) < 2:
@@ -146,7 +149,8 @@ class BodyAssembler:
         # Find QUOTE lines that are between first and last content lines
         inline_quotes: set[int] = set()
         for idx in range(end_index):
-            if labeled_lines[idx].label == "QUOTE":
+            line = lines[idx]
+            if not line.is_blank and line.label == "QUOTE":
                 if first_content < idx < last_content:
                     inline_quotes.add(idx)
 
@@ -154,7 +158,7 @@ class BodyAssembler:
 
     def _build_content_blocks(
         self,
-        labeled_lines: tuple[LabeledLine, ...],
+        lines: tuple[ReconstructedLine, ...],
         signature_index: int | None,
         inline_quote_indices: set[int],
     ) -> list[list[int]]:
@@ -164,25 +168,31 @@ class BodyAssembler:
         - BODY lines accumulate into current block
         - Inline QUOTE lines are included in current block
         - GREETING and CLOSING lines are included if adjacent to BODY
-        - OTHER lines are buffered; included if between content
+        - OTHER lines (and blank lines) are buffered; included if between content
         - Trailing/leading QUOTE lines create hard breaks
 
         Args:
-            labeled_lines: Sequence of labeled lines.
+            lines: Sequence of reconstructed lines.
             signature_index: Index of signature boundary, or None.
             inline_quote_indices: Set of inline quote indices.
 
         Returns:
             List of blocks, where each block is a list of line indices.
         """
-        end_index = signature_index if signature_index is not None else len(labeled_lines)
+        end_index = signature_index if signature_index is not None else len(lines)
 
         blocks: list[list[int]] = []
         current_block: list[int] = []
         separator_buffer: list[int] = []
 
         for idx in range(end_index):
-            line = labeled_lines[idx]
+            line = lines[idx]
+
+            # Blank lines act as separators (buffer them)
+            if line.is_blank:
+                separator_buffer.append(idx)
+                continue
+
             label = line.label
 
             if label == "BODY":
@@ -262,7 +272,7 @@ class BodyAssembler:
 
     def _assemble_text(
         self,
-        labeled_lines: tuple[LabeledLine, ...],
+        lines: tuple[ReconstructedLine, ...],
         selected_indices: list[int],
     ) -> str:
         """Assemble final text from selected line indices.
@@ -270,7 +280,7 @@ class BodyAssembler:
         Preserves original line breaks by joining with newlines.
 
         Args:
-            labeled_lines: Sequence of labeled lines.
+            lines: Sequence of reconstructed lines.
             selected_indices: Indices of lines to include.
 
         Returns:
@@ -279,5 +289,5 @@ class BodyAssembler:
         if not selected_indices:
             return ""
 
-        lines = [labeled_lines[idx].text for idx in selected_indices]
-        return "\n".join(lines)
+        text_lines = [lines[idx].text for idx in selected_indices]
+        return "\n".join(text_lines)

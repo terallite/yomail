@@ -77,8 +77,8 @@ class TestReconstructor:
         assert result.lines[1].is_blank is True
         assert result.lines[2].is_blank is False
 
-    def test_blank_lines_have_no_label(self) -> None:
-        """Blank lines have label=None."""
+    def test_blank_lines_inherit_preceding_label(self) -> None:
+        """Blank lines inherit the preceding content line's label."""
         whitespace_map = WhitespaceMap(
             content_to_original=(0, 2),
             blank_positions=frozenset({1}),
@@ -86,7 +86,7 @@ class TestReconstructor:
         )
         labeling = _make_labeling([
             ("Line 1", "BODY", 0.9),
-            ("Line 2", "BODY", 0.8),
+            ("Line 2", "CLOSING", 0.8),
         ])
 
         reconstructor = Reconstructor()
@@ -94,9 +94,35 @@ class TestReconstructor:
             labeling, whitespace_map, ("Line 1", "", "Line 2")
         )
 
-        assert result.lines[1].label is None
+        # Blank line inherits BODY from preceding content line
+        assert result.lines[1].label == "BODY"
+        # Confidence and probabilities are still None for blank lines
         assert result.lines[1].confidence is None
         assert result.lines[1].label_probabilities is None
+
+    def test_multiple_blanks_inherit_same_label(self) -> None:
+        """Multiple consecutive blank lines all inherit the same preceding label."""
+        whitespace_map = WhitespaceMap(
+            content_to_original=(0, 4),
+            blank_positions=frozenset({1, 2, 3}),
+            original_line_count=5,
+        )
+        labeling = _make_labeling([
+            ("First", "BODY", 0.9),
+            ("Second", "SIGNATURE", 0.8),
+        ])
+
+        reconstructor = Reconstructor()
+        result = reconstructor.reconstruct(
+            labeling, whitespace_map, ("First", "", "", "", "Second")
+        )
+
+        # All blank lines inherit BODY from the first content line
+        assert result.lines[1].label == "BODY"
+        assert result.lines[2].label == "BODY"
+        assert result.lines[3].label == "BODY"
+        # The second content line has its own label
+        assert result.lines[4].label == "SIGNATURE"
 
     def test_original_index_correct(self) -> None:
         """All lines have correct original_index."""

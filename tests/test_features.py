@@ -264,14 +264,22 @@ class TestContextualFeatures:
 
     def test_blank_line_context_features(self) -> None:
         """Blank lines tracked via blank_lines_before/after."""
-        text = "\n\nText\n\n"
+        # Note: leading/trailing blanks are removed by normalizer
+        # Internal blanks between content lines are preserved
+        text = "First\n\n\nSecond\n\nThird"
         result = _extract_features(text)
 
-        # Only one content line after filtering
-        assert len(result.line_features) == 1
-        # "Text" has 2 blanks before and 2 blanks after
-        assert result.line_features[0].blank_lines_before == 2
+        # Three content lines after filtering
+        assert len(result.line_features) == 3
+        # First line has no blanks before, 2 blanks after
+        assert result.line_features[0].blank_lines_before == 0
         assert result.line_features[0].blank_lines_after == 2
+        # Second line has 2 blanks before, 1 blank after
+        assert result.line_features[1].blank_lines_before == 2
+        assert result.line_features[1].blank_lines_after == 1
+        # Third line has 1 blank before, no blanks after
+        assert result.line_features[2].blank_lines_before == 1
+        assert result.line_features[2].blank_lines_after == 0
 
     def test_context_quote_count(self) -> None:
         """Quote count in context window."""

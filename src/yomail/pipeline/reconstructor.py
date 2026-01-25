@@ -17,7 +17,8 @@ class ReconstructedLine:
         text: Line text.
         original_index: Position in the original document.
         is_blank: True if this was a blank line (filtered before ML).
-        label: CRF-assigned label (None for blank lines).
+        label: CRF-assigned label. Blank lines inherit the preceding content
+            line's label (or None if at document start with no prior content).
         confidence: Marginal probability for the label (None for blank lines).
         label_probabilities: All label probabilities (None for blank lines).
     """
@@ -47,7 +48,8 @@ class Reconstructor:
     """Reconstructs full document from content-only labels.
 
     Blank lines are reinserted at their original positions with
-    is_blank=True and no label.
+    is_blank=True. They inherit the preceding content line's label
+    to maintain context through whitespace.
     """
 
     def reconstruct(
@@ -68,16 +70,17 @@ class Reconstructor:
         """
         result: list[ReconstructedLine] = []
         content_idx = 0
+        last_content_label: Label | None = None
 
         for orig_idx in range(whitespace_map.original_line_count):
             if orig_idx in whitespace_map.blank_positions:
-                # Blank line - no label
+                # Blank line - inherit previous content line's label
                 result.append(
                     ReconstructedLine(
                         text=original_lines[orig_idx],
                         original_index=orig_idx,
                         is_blank=True,
-                        label=None,
+                        label=last_content_label,
                         confidence=None,
                         label_probabilities=None,
                     )
@@ -85,6 +88,7 @@ class Reconstructor:
             else:
                 # Content line - use CRF result
                 labeled = labeling.labeled_lines[content_idx]
+                last_content_label = labeled.label
                 result.append(
                     ReconstructedLine(
                         text=labeled.text,

@@ -17,11 +17,11 @@ from yomail.exceptions import (
     NoBodyDetectedError,
 )
 from yomail.pipeline.assembler import BodyAssembler
-from yomail.pipeline.confidence import ConfidenceGate
 from yomail.pipeline.content_filter import ContentFilter
 from yomail.pipeline.crf import CRFSequenceLabeler, LabeledLine
 from yomail.pipeline.features import FeatureExtractor
 from yomail.pipeline.normalizer import Normalizer
+from yomail.pipeline.reconstructor import Reconstructor
 from yomail.pipeline.structural import StructuralAnalyzer
 
 logger = logging.getLogger(__name__)
@@ -91,10 +91,11 @@ class EmailBodyExtractor:
         self._structural_analyzer = StructuralAnalyzer()
         self._feature_extractor = FeatureExtractor()
         self._crf_labeler = CRFSequenceLabeler(model_path)
+        self._reconstructor = Reconstructor()
         self._body_assembler = BodyAssembler()
-        self._confidence_gate = ConfidenceGate(confidence_threshold=confidence_threshold)
 
         self._model_path = Path(model_path) if model_path else None
+        self._confidence_threshold = confidence_threshold
 
     def load_model(self, model_path: Path | str) -> None:
         """Load a CRF model.
@@ -211,11 +212,16 @@ class EmailBodyExtractor:
             content_texts = tuple(line.text for line in filtered.content_lines)
             labeling = self._crf_labeler.predict(features, content_texts)
 
-            # Step 6: Body assembly
-            assembled = self._body_assembler.assemble(labeling)
+            # Step 6: Confidence is the Viterbi sequence probability
+            confidence = labeling.sequence_probability
 
-            # Step 7: Confidence check
-            confidence_result = self._confidence_gate.compute(labeling, assembled)
+            # Step 7: Reconstruct full document (reinsert blank lines)
+            reconstructed = self._reconstructor.reconstruct(
+                labeling, filtered.whitespace_map, filtered.original_lines
+            )
+
+            # Step 8: Body assembly (on full document)
+            assembled = self._body_assembler.assemble(reconstructed)
 
             # Determine success and error
             error: ExtractionError | None = None
@@ -224,17 +230,17 @@ class EmailBodyExtractor:
             if not assembled.success:
                 error = NoBodyDetectedError(message="No body content found")
                 success = False
-            elif not confidence_result.passes_threshold:
+            elif confidence < self._confidence_threshold:
                 error = LowConfidenceError(
                     message="Extraction confidence below threshold",
-                    confidence=confidence_result.confidence,
-                    threshold=confidence_result.threshold,
+                    confidence=confidence,
+                    threshold=self._confidence_threshold,
                 )
                 success = False
 
             return ExtractionResult(
                 body=assembled.body_text if assembled.success else None,
-                confidence=confidence_result.confidence,
+                confidence=confidence,
                 success=success,
                 error=error,
                 labeled_lines=labeling.labeled_lines,

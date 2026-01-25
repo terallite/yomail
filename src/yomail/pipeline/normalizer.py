@@ -53,16 +53,24 @@ class Normalizer:
         # Apply Japanese text normalization
         text = self._normalize_japanese(text)
 
-        # Split into lines
-        lines = text.split("\n")
+        # Split into lines and strip whitespace from each
+        lines = [line.strip() for line in text.split("\n")]
+
+        # Remove leading blank lines
+        while lines and not lines[0]:
+            lines.pop(0)
+
+        # Remove trailing blank lines
+        while lines and not lines[-1]:
+            lines.pop()
 
         # Check for empty result
-        if not lines or all(line.strip() == "" for line in lines):
+        if not lines:
             raise InvalidInputError(message="Empty input after normalization")
 
         return NormalizedEmail(
             lines=tuple(lines),
-            text=text,
+            text="\n".join(lines),
         )
 
     # Dash-like characters for unification

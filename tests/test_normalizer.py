@@ -17,11 +17,12 @@ class TestNormalizerBasic:
         assert result.text == "Hello\nWorld"
 
     def test_crlf_normalization(self) -> None:
-        """CRLF line endings are converted to LF."""
+        """CRLF line endings are converted to LF, trailing blank removed."""
         normalizer = Normalizer()
         result = normalizer.normalize("Line1\r\nLine2\r\n")
 
-        assert result.lines == ("Line1", "Line2", "")
+        # Trailing blank line is removed
+        assert result.lines == ("Line1", "Line2")
         assert "\r" not in result.text
 
     def test_cr_normalization(self) -> None:
@@ -45,10 +46,38 @@ class TestNormalizerBasic:
         with pytest.raises(InvalidInputError):
             normalizer.normalize("   \n\n   \t  ")
 
-    def test_preserves_blank_lines(self) -> None:
-        """Blank lines are preserved in output."""
+    def test_preserves_internal_blank_lines(self) -> None:
+        """Internal blank lines are preserved in output."""
         normalizer = Normalizer()
         result = normalizer.normalize("Para1\n\nPara2")
+
+        assert result.lines == ("Para1", "", "Para2")
+
+    def test_strips_leading_blank_lines(self) -> None:
+        """Leading blank lines are removed."""
+        normalizer = Normalizer()
+        result = normalizer.normalize("\n\nContent")
+
+        assert result.lines == ("Content",)
+
+    def test_strips_trailing_blank_lines(self) -> None:
+        """Trailing blank lines are removed."""
+        normalizer = Normalizer()
+        result = normalizer.normalize("Content\n\n")
+
+        assert result.lines == ("Content",)
+
+    def test_strips_whitespace_from_lines(self) -> None:
+        """Leading/trailing whitespace is stripped from each line."""
+        normalizer = Normalizer()
+        result = normalizer.normalize("  Hello  \n  World  ")
+
+        assert result.lines == ("Hello", "World")
+
+    def test_whitespace_only_lines_become_empty(self) -> None:
+        """Lines with only whitespace become empty strings (blank lines)."""
+        normalizer = Normalizer()
+        result = normalizer.normalize("Para1\n   \t   \nPara2")
 
         assert result.lines == ("Para1", "", "Para2")
 

@@ -163,7 +163,10 @@ class TestEndToEndExtraction:
             model_path = Path(tmpdir) / "test.crfsuite"
             _train_test_model(model_path)
 
-            extractor = EmailBodyExtractor(model_path=model_path)
+            # Use lower threshold for minimal test model (Viterbi scores are lower)
+            extractor = EmailBodyExtractor(
+                model_path=model_path, confidence_threshold=0.1
+            )
 
             email = "明日の予定を確認しました。\n問題ありません。"
             body = extractor.extract(email)

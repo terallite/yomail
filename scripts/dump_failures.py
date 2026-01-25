@@ -19,9 +19,9 @@ sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
 from yomail import EmailBodyExtractor
 from yomail.exceptions import ExtractionError
-from yomail.pipeline.normalizer import Normalizer
 
-_normalizer = Normalizer()
+# Import shared helper from evaluate.py
+from evaluate import get_expected_body
 
 
 def normalize_text(text: str | None) -> str:
@@ -32,84 +32,6 @@ def normalize_text(text: str | None) -> str:
     lines = [line.strip() for line in lines]
     lines = [line for line in lines if line]
     return "\n".join(lines)
-
-
-def get_expected_body(lines_data: list[dict]) -> str:
-    """Compute expected body same way as evaluate.py - with normalization."""
-    # First normalize all lines
-    normalized_lines = []
-    for item in lines_data:
-        text = item["text"]
-        if not text or not text.strip():
-            normalized_lines.append({"text": "", "label": item["label"]})
-        else:
-            try:
-                normalized = _normalizer.normalize(text)
-                normalized_text = "\n".join(normalized.lines) if normalized.lines else ""
-                normalized_lines.append({"text": normalized_text, "label": item["label"]})
-            except Exception:
-                normalized_lines.append({"text": text, "label": item["label"]})
-    lines_data = normalized_lines
-
-    content_labels = {"GREETING", "BODY", "CLOSING"}
-    content_indices = [
-        i
-        for i, line in enumerate(lines_data)
-        if line["label"] in content_labels
-    ]
-    if len(content_indices) < 2:
-        first_content = content_indices[0] if content_indices else -1
-        last_content = content_indices[-1] if content_indices else -1
-    else:
-        first_content = content_indices[0]
-        last_content = content_indices[-1]
-
-    # Find signature boundary
-    signature_index = None
-    for idx, item in enumerate(lines_data):
-        if item["label"] == "SIGNATURE":
-            signature_index = idx
-            break
-    end_index = signature_index if signature_index is not None else len(lines_data)
-
-    # Build content blocks
-    blocks: list[list[str]] = []
-    current_block: list[str] = []
-    separator_buffer: list[str] = []
-
-    for idx in range(end_index):
-        item = lines_data[idx]
-        label = item["label"]
-        text = item["text"]
-
-        if label in content_labels:
-            current_block.extend(separator_buffer)
-            separator_buffer = []
-            current_block.append(text)
-        elif label == "OTHER":
-            separator_buffer.append(text)
-        elif label == "QUOTE":
-            if first_content < idx < last_content:
-                current_block.extend(separator_buffer)
-                separator_buffer = []
-                current_block.append(text)
-            else:
-                if current_block:
-                    blocks.append(current_block)
-                    current_block = []
-                separator_buffer = []
-
-    if current_block:
-        blocks.append(current_block)
-
-    # Select body
-    selected_lines: list[str] = []
-    if signature_index is not None:
-        for block in blocks:
-            selected_lines.extend(block)
-    elif blocks:
-        selected_lines = max(blocks, key=lambda x: len(x))
-    return "\n".join(selected_lines)
 
 
 def main():
@@ -176,7 +98,7 @@ def main():
             result = extractor.extract_with_metadata(ex["email_text"])
             if result is None or result.body is None:
                 continue
-            expected = get_expected_body(ex["lines"])
+            expected = get_expected_body(ex)
             extracted_norm = normalize_text(result.body)
             expected_norm = normalize_text(expected)
             if extracted_norm != expected_norm:

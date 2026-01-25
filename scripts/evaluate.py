@@ -21,11 +21,14 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
 from yomail import EmailBodyExtractor
+from yomail.pipeline.assembler import BodyAssembler
 from yomail.pipeline.crf import LABELS, Label
 from yomail.pipeline.normalizer import Normalizer
+from yomail.pipeline.reconstructor import ReconstructedDocument, ReconstructedLine
 
-# Shared normalizer for expected body computation
+# Shared components for expected body computation
 _normalizer = Normalizer()
+_assembler = BodyAssembler()
 
 
 @dataclass
@@ -168,107 +171,75 @@ def is_acceptable_extraction(expected: str, extracted: str) -> bool:
 
 
 def get_expected_body(example: dict) -> str:
-    """Extract expected body from training example.
+    """Extract expected body using BodyAssembler on ground truth labels.
 
-    Computes expected body the same way BodyAssembler does:
-    - Include GREETING, BODY, CLOSING, and intervening OTHER (separators)
-    - Stop at first SIGNATURE line
-    - Exclude trailing/leading QUOTE lines
-    - Include inline QUOTE lines (quotes between BODY content)
-
-    Also normalizes text the same way the extractor does.
+    This ensures expected body is computed exactly the same way as the
+    extractor's body assembly logic, including text normalization.
     """
     lines_data = example.get("lines") or example.get("line_labels", [])
-
-    # Normalize the line texts the same way the extractor does
-    normalized_lines = []
-    for item in lines_data:
-        text = item["text"]
-        if not text or not text.strip():
-            # Empty lines stay empty
-            normalized_lines.append({"text": "", "label": item["label"]})
-        else:
-            try:
-                # Apply normalizer to each line
-                normalized = _normalizer.normalize(text)
-                # The normalizer splits into lines, so join them back
-                normalized_text = "\n".join(normalized.lines) if normalized.lines else ""
-                normalized_lines.append({"text": normalized_text, "label": item["label"]})
-            except Exception:
-                # If normalization fails, use original text
-                normalized_lines.append({"text": text, "label": item["label"]})
-    lines_data = normalized_lines
-
     if not lines_data:
         return ""
 
-    # Find signature boundary
-    signature_index = None
-    for idx, item in enumerate(lines_data):
-        if item["label"] == "SIGNATURE":
-            signature_index = idx
-            break
-
-    end_index = signature_index if signature_index is not None else len(lines_data)
-
-    # Find content line indices (GREETING, BODY, CLOSING) to determine inline vs trailing quotes
-    content_labels = {"GREETING", "BODY", "CLOSING"}
-    content_indices = [i for i, item in enumerate(lines_data[:end_index]) if item["label"] in content_labels]
-
-    if len(content_indices) < 2:
-        first_content = content_indices[0] if content_indices else -1
-        last_content = content_indices[-1] if content_indices else -1
-    else:
-        first_content = content_indices[0]
-        last_content = content_indices[-1]
-
-    # Build content blocks (mimicking BodyAssembler logic)
-    content_labels = {"GREETING", "BODY", "CLOSING"}
-    blocks: list[list[str]] = []
-    current_block: list[str] = []
-    separator_buffer: list[str] = []
-
-    for idx in range(end_index):
-        item = lines_data[idx]
-        label = item["label"]
+    # Normalize each line's text the same way the extractor does
+    processed: list[tuple[str, str, bool]] = []
+    for item in lines_data:
         text = item["text"]
+        label = item["label"]
 
-        if label in content_labels:
-            # Flush separator buffer
-            current_block.extend(separator_buffer)
-            separator_buffer = []
-            current_block.append(text)
+        if not text or not text.strip():
+            # Blank lines
+            processed.append(("", label, True))
+        else:
+            # Apply full normalization to content lines
+            try:
+                normalized = _normalizer.normalize(text)
+                # For a single line, normalized.lines is a tuple with one element
+                normalized_text = normalized.lines[0] if normalized.lines else ""
+                processed.append((normalized_text, label, False))
+            except Exception:
+                # If normalization fails, use stripped text
+                processed.append((text.strip(), label, False))
 
-        elif label == "OTHER":
-            # Buffer separators (blank lines, etc.)
-            separator_buffer.append(text)
+    # Remove leading blank lines (matching normalizer behavior)
+    while processed and processed[0][2]:  # is_blank
+        processed.pop(0)
 
-        elif label == "QUOTE":
-            # Only include if inline (between first and last content)
-            if first_content < idx < last_content:
-                current_block.extend(separator_buffer)
-                separator_buffer = []
-                current_block.append(text)
-            else:
-                # Trailing/leading quote - hard break
-                if current_block:
-                    blocks.append(current_block)
-                    current_block = []
-                separator_buffer = []
+    # Remove trailing blank lines (matching normalizer behavior)
+    while processed and processed[-1][2]:  # is_blank
+        processed.pop()
 
-    # Flush remaining block
-    if current_block:
-        blocks.append(current_block)
+    if not processed:
+        return ""
 
-    # Select body (all blocks if signature present, longest otherwise)
-    if signature_index is not None:
-        selected_lines: list[str] = []
-        for block in blocks:
-            selected_lines.extend(block)
-    else:
-        selected_lines = max(blocks, key=len) if blocks else []
+    # Create ReconstructedDocument from ground truth
+    reconstructed_lines: list[ReconstructedLine] = []
+    last_content_label = None
 
-    return "\n".join(selected_lines)  # type: ignore[arg-type]
+    for idx, (text, label, is_blank) in enumerate(processed):
+        if is_blank:
+            # Blank lines inherit preceding content label (matching reconstructor)
+            reconstructed_lines.append(ReconstructedLine(
+                text=text,
+                original_index=idx,
+                is_blank=True,
+                label=last_content_label,
+                confidence=None,
+                label_probabilities=None,
+            ))
+        else:
+            last_content_label = label
+            reconstructed_lines.append(ReconstructedLine(
+                text=text,
+                original_index=idx,
+                is_blank=False,
+                label=label,
+                confidence=1.0,
+                label_probabilities=None,
+            ))
+
+    doc = ReconstructedDocument(lines=tuple(reconstructed_lines), sequence_probability=1.0)
+    assembled = _assembler.assemble(doc)
+    return assembled.body_text
 
 
 def get_ground_truth_labels(example: dict) -> list[Label]:
