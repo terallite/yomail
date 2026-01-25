@@ -13,6 +13,7 @@ from dataclasses import dataclass
 
 from yomail.patterns.closings import is_closing_line
 from yomail.patterns.greetings import is_greeting_line
+from yomail.patterns.names import is_name_line
 from yomail.patterns.signatures import (
     is_company_line,
     is_contact_info_line,
@@ -62,6 +63,7 @@ class LineFeatures:
     has_contact_info: bool
     has_company_pattern: bool
     has_position_pattern: bool
+    has_name_pattern: bool
     is_visual_separator: bool
     has_meta_discussion: bool
     is_inside_quotation_marks: bool
@@ -229,6 +231,7 @@ class FeatureExtractor:
             has_contact_info=flags["has_contact_info"],
             has_company_pattern=flags["has_company_pattern"],
             has_position_pattern=flags["has_position_pattern"],
+            has_name_pattern=flags["has_name_pattern"],
             is_visual_separator=flags["is_visual_separator"],
             has_meta_discussion=flags["has_meta_discussion"],
             is_inside_quotation_marks=flags["is_inside_quotation_marks"],
@@ -251,6 +254,7 @@ class FeatureExtractor:
             "has_contact_info": is_contact_info_line(text),
             "has_company_pattern": is_company_line(text),
             "has_position_pattern": is_position_line(text),
+            "has_name_pattern": is_name_line(text),
             "is_visual_separator": is_visual_separator_line(text),
             "has_meta_discussion": self._has_meta_discussion(text),
             "is_inside_quotation_marks": self._is_inside_quotation_marks(text),

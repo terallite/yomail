@@ -114,6 +114,7 @@ def _features_to_dict(features: LineFeatures, idx: int, total_lines: int) -> dic
     feat["has_contact_info"] = features.has_contact_info
     feat["has_company_pattern"] = features.has_company_pattern
     feat["has_position_pattern"] = features.has_position_pattern
+    feat["has_name_pattern"] = features.has_name_pattern
     feat["is_visual_separator"] = features.is_visual_separator
     feat["has_meta_discussion"] = features.has_meta_discussion
     feat["is_inside_quotation_marks"] = features.is_inside_quotation_marks
