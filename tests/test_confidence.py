@@ -18,7 +18,6 @@ def _make_labeled_line(
         "CLOSING": 0.0,
         "SIGNATURE": 0.0,
         "QUOTE": 0.0,
-        "SEPARATOR": 0.0,
         "OTHER": 0.0,
     }
     probs[label] = confidence

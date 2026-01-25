@@ -38,7 +38,7 @@ def _train_test_model(model_path: Path) -> None:
         ),
         (
             "ご確認ください。\n---\n田中太郎\nTEL: 03-1234-5678",
-            ("BODY", "SEPARATOR", "SIGNATURE", "SIGNATURE"),
+            ("BODY", "OTHER", "SIGNATURE", "SIGNATURE"),
         ),
         (
             "> 前回のメール\n承知しました。",

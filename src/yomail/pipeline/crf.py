@@ -6,8 +6,7 @@ Uses python-crfsuite to predict labels for each line of an email:
 - CLOSING: Closing formulas
 - SIGNATURE: Signature block lines
 - QUOTE: Quoted content
-- SEPARATOR: Visual dividers, blank lines
-- OTHER: Headers, noise, unclassifiable
+- OTHER: Visual dividers, headers, noise, unclassifiable
 """
 
 import logging
@@ -22,10 +21,10 @@ from yomail.pipeline.features import ExtractedFeatures, LineFeatures
 logger = logging.getLogger(__name__)
 
 
-# Label definitions matching DESIGN.md
-Label = Literal["GREETING", "BODY", "CLOSING", "SIGNATURE", "QUOTE", "SEPARATOR", "OTHER"]
+# Label definitions
+Label = Literal["GREETING", "BODY", "CLOSING", "SIGNATURE", "QUOTE", "OTHER"]
 
-LABELS: tuple[Label, ...] = ("GREETING", "BODY", "CLOSING", "SIGNATURE", "QUOTE", "SEPARATOR", "OTHER")
+LABELS: tuple[Label, ...] = ("GREETING", "BODY", "CLOSING", "SIGNATURE", "QUOTE", "OTHER")
 
 
 @dataclass(frozen=True, slots=True)

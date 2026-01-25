@@ -162,10 +162,9 @@ class BodyAssembler:
 
         Block building rules:
         - BODY lines accumulate into current block
-        - SEPARATOR lines are buffered; included if followed by more BODY
         - Inline QUOTE lines are included in current block
         - GREETING and CLOSING lines are included if adjacent to BODY
-        - OTHER lines create hard breaks between blocks
+        - OTHER lines are buffered; included if between content
         - Trailing/leading QUOTE lines create hard breaks
 
         Args:
@@ -187,14 +186,10 @@ class BodyAssembler:
             label = line.label
 
             if label == "BODY":
-                # Flush separator buffer - separators before BODY are included
+                # Flush buffer - buffered lines before BODY are included
                 current_block.extend(separator_buffer)
                 separator_buffer = []
                 current_block.append(idx)
-
-            elif label == "SEPARATOR":
-                # Buffer separators - only include if followed by more BODY
-                separator_buffer.append(idx)
 
             elif label == "QUOTE":
                 if idx in inline_quote_indices:

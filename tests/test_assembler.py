@@ -11,14 +11,13 @@ def _make_labeled_line(
 ) -> LabeledLine:
     """Create a LabeledLine with default probabilities."""
     # Simple probability distribution - label gets the confidence, others get the rest
-    other_prob = (1.0 - confidence) / 6.0
+    other_prob = (1.0 - confidence) / 5.0
     probs: dict[Label, float] = {
         "GREETING": other_prob,
         "BODY": other_prob,
         "CLOSING": other_prob,
         "SIGNATURE": other_prob,
         "QUOTE": other_prob,
-        "SEPARATOR": other_prob,
         "OTHER": other_prob,
     }
     probs[label] = confidence
@@ -59,7 +58,7 @@ class TestSignatureBoundary:
         """Signature at end excludes signature lines."""
         result = _make_result([
             ("Hello", "BODY"),
-            ("---", "SEPARATOR"),
+            ("---", "OTHER"),
             ("John Doe", "SIGNATURE"),
             ("john@example.com", "SIGNATURE"),
         ])
@@ -141,24 +140,24 @@ class TestContentBlocks:
 
         assert assembled.body_text == "Line 1\nLine 2\nLine 3"
 
-    def test_separator_included_if_followed_by_body(self) -> None:
-        """Separators are included when followed by more BODY."""
+    def test_other_included_if_followed_by_body(self) -> None:
+        """OTHER lines are included when between BODY lines."""
         result = _make_result([
             ("Paragraph 1", "BODY"),
-            ("", "SEPARATOR"),
+            ("[some header noise]", "OTHER"),
             ("Paragraph 2", "BODY"),
         ])
         assembler = BodyAssembler()
         assembled = assembler.assemble(result)
 
-        assert assembled.body_text == "Paragraph 1\n\nParagraph 2"
+        assert assembled.body_text == "Paragraph 1\n[some header noise]\nParagraph 2"
 
-    def test_trailing_separator_excluded(self) -> None:
-        """Separators at end are not included."""
+    def test_trailing_other_excluded(self) -> None:
+        """OTHER lines at end are not included."""
         result = _make_result([
             ("Content", "BODY"),
-            ("", "SEPARATOR"),
-            ("", "SEPARATOR"),
+            ("[noise 1]", "OTHER"),
+            ("[noise 2]", "OTHER"),
         ])
         assembler = BodyAssembler()
         assembled = assembler.assemble(result)
