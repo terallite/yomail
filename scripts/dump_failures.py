@@ -103,13 +103,12 @@ def get_expected_body(lines_data: list[dict]) -> str:
         blocks.append(current_block)
 
     # Select body
+    selected_lines: list[str] = []
     if signature_index is not None:
-        selected_lines: list[str] = []
         for block in blocks:
             selected_lines.extend(block)
-    else:
-        selected_lines = max(blocks, key=len) if blocks else []
-
+    elif blocks:
+        selected_lines = max(blocks, key=lambda x: len(x))
     return "\n".join(selected_lines)
 
 

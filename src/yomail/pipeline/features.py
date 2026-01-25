@@ -76,6 +76,11 @@ class LineFeatures:
     context_quote_count: int
     context_separator_count: int
 
+    # Look-ahead features (signature territory detection)
+    has_name_pattern_below: bool
+    has_contact_info_below: bool
+    has_closing_pattern_below: bool
+
 
 @dataclass(frozen=True, slots=True)
 class ExtractedFeatures:
@@ -201,6 +206,9 @@ class FeatureExtractor:
         # Contextual features (window ±2)
         context = self._compute_context_features(idx, all_lines, all_flags)
 
+        # Look-ahead features (check lines below for signature territory signals)
+        lookahead = self._compute_lookahead_features(idx, all_flags)
+
         return LineFeatures(
             # Positional
             position_normalized=position_normalized,
@@ -242,6 +250,10 @@ class FeatureExtractor:
             context_blank_count=context["blank_count"],
             context_quote_count=context["quote_count"],
             context_separator_count=context["separator_count"],
+            # Look-ahead
+            has_name_pattern_below=lookahead["has_name_below"],
+            has_contact_info_below=lookahead["has_contact_below"],
+            has_closing_pattern_below=lookahead["has_closing_below"],
         )
 
     def _compute_pattern_flags(self, annotated_line: AnnotatedLine) -> dict[str, bool]:
@@ -391,4 +403,43 @@ class FeatureExtractor:
             "blank_count": blank_count,
             "quote_count": quote_count,
             "separator_count": separator_count,
+        }
+
+    def _compute_lookahead_features(
+        self,
+        idx: int,
+        all_flags: list[dict[str, bool]],
+    ) -> dict[str, bool]:
+        """Compute look-ahead features from lines below current position.
+
+        These features help the model understand when it's approaching
+        signature territory without requiring predicted labels.
+
+        Args:
+            idx: Current line index.
+            all_flags: Pre-computed pattern flags for all lines.
+
+        Returns:
+            Dictionary with look-ahead feature values.
+        """
+        total = len(all_flags)
+
+        # Check all lines below the current one
+        has_name_below = False
+        has_contact_below = False
+        has_closing_below = False
+
+        for i in range(idx + 1, total):
+            flags = all_flags[i]
+            if flags["has_name_pattern"]:
+                has_name_below = True
+            if flags["has_contact_info"]:
+                has_contact_below = True
+            if flags["is_closing"]:
+                has_closing_below = True
+
+        return {
+            "has_name_below": has_name_below,
+            "has_contact_below": has_contact_below,
+            "has_closing_below": has_closing_below,
         }

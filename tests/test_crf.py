@@ -55,6 +55,9 @@ def _make_line_features(
     context_blank_count: int = 0,
     context_quote_count: int = 0,
     context_separator_count: int = 0,
+    has_name_pattern_below: bool = False,
+    has_contact_info_below: bool = False,
+    has_closing_pattern_below: bool = False,
 ) -> LineFeatures:
     """Create a LineFeatures with sensible defaults."""
     return LineFeatures(
@@ -93,6 +96,9 @@ def _make_line_features(
         context_blank_count=context_blank_count,
         context_quote_count=context_quote_count,
         context_separator_count=context_separator_count,
+        has_name_pattern_below=has_name_pattern_below,
+        has_contact_info_below=has_contact_info_below,
+        has_closing_pattern_below=has_closing_pattern_below,
     )
 
 
