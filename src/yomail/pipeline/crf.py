@@ -127,11 +127,6 @@ def _features_to_dict(features: LineFeatures, idx: int, total_lines: int) -> dic
     feat["ctx_quote_count"] = float(features.context_quote_count)
     feat["ctx_separator_count"] = float(features.context_separator_count)
 
-    # Look-ahead features (signature territory detection)
-    feat["has_name_below"] = features.has_name_pattern_below
-    feat["has_contact_below"] = features.has_contact_info_below
-    feat["has_closing_below"] = features.has_closing_pattern_below
-
     # Derived categorical features for stronger signal
     if features.quote_depth > 0:
         feat["quote_depth_cat"] = "quoted"
