@@ -18,3 +18,6 @@ CLAUDE.local.md
 # Training data and models (too large for git)
 data/
 models/*.crfsuite
+
+# Temporary files
+tmp/
