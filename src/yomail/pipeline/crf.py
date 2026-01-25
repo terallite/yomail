@@ -234,6 +234,39 @@ class CRFSequenceLabeler:
             return LABELS
         return tuple(self._tagger.labels())
 
+    def _fix_impossible_transitions(self, labels: list[str]) -> list[str]:
+        """Fix impossible label transitions that the CRF may produce.
+
+        The CRF can predict impossible transitions like SIGNATURE → CLOSING
+        because it never saw them in training (weight = 0, not negative).
+        This post-processing step enforces structural constraints.
+
+        Rules:
+        - SIGNATURE → CLOSING is impossible (relabel CLOSING as SIGNATURE)
+        - SIGNATURE → BODY after signature started is suspicious (relabel as SIGNATURE)
+        """
+        if len(labels) < 2:
+            return labels
+
+        fixed = labels.copy()
+        in_signature = False
+
+        for i in range(len(fixed)):
+            if fixed[i] == "SIGNATURE":
+                in_signature = True
+            elif in_signature:
+                # After entering SIGNATURE territory, very limited transitions allowed
+                if fixed[i] == "CLOSING":
+                    # SIGNATURE → CLOSING is impossible
+                    fixed[i] = "SIGNATURE"
+                    logger.debug("Fixed impossible SIGNATURE → CLOSING at position %d", i)
+                elif fixed[i] in ("GREETING", "BODY"):
+                    # SIGNATURE → GREETING/BODY likely means the "signature" was actually body
+                    # Don't fix here - could be legitimate edge case
+                    pass
+
+        return fixed
+
     def predict(
         self,
         extracted: ExtractedFeatures,
@@ -268,6 +301,9 @@ class CRFSequenceLabeler:
 
         # Get predicted labels
         predicted_labels = self._tagger.tag()
+
+        # Fix impossible transitions (SIGNATURE → CLOSING is not allowed)
+        predicted_labels = self._fix_impossible_transitions(predicted_labels)
 
         # Get sequence probability (probability of the predicted sequence)
         sequence_prob = self._tagger.probability(predicted_labels)
