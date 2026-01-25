@@ -3,13 +3,17 @@
 Extracts per-line features from structurally analyzed email text:
 - Positional features (normalized position, distance from start/end)
 - Content features (length, character class ratios, whitespace)
+- Whitespace context features (blank lines before/after)
 - Pattern flags (greeting, closing, contact info, etc.)
 - Contextual features (aggregates from surrounding lines)
 """
 
+from __future__ import annotations
+
 import re
 import unicodedata
 from dataclasses import dataclass
+from typing import TYPE_CHECKING
 
 from yomail.patterns.closings import is_closing_line
 from yomail.patterns.greetings import is_greeting_line
@@ -21,6 +25,9 @@ from yomail.patterns.signatures import (
     is_visual_separator_line,
 )
 from yomail.pipeline.structural import AnnotatedLine, StructuralAnalysis
+
+if TYPE_CHECKING:
+    from yomail.pipeline.content_filter import FilteredContent
 
 
 @dataclass(frozen=True, slots=True)
@@ -49,7 +56,10 @@ class LineFeatures:
     symbol_ratio: float
     leading_whitespace: int
     trailing_whitespace: int
-    is_blank: bool
+
+    # Whitespace context features (from ContentFilter)
+    blank_lines_before: int
+    blank_lines_after: int
 
     # Structural features (from StructuralAnalyzer)
     quote_depth: int
@@ -68,11 +78,10 @@ class LineFeatures:
     has_meta_discussion: bool
     is_inside_quotation_marks: bool
 
-    # Contextual features (window ±2 lines)
+    # Contextual features (window ±2 content lines)
     context_greeting_count: int
     context_closing_count: int
     context_contact_count: int
-    context_blank_count: int
     context_quote_count: int
     context_separator_count: int
 
@@ -114,22 +123,29 @@ _QUOTATION_PAIRS = (
 
 
 class FeatureExtractor:
-    """Extracts features from structurally analyzed email text.
+    """Extracts features from content-only email text.
 
     Features are designed for CRF sequence labeling to classify
-    each line as GREETING, BODY, CLOSING, SIGNATURE, QUOTE, SEPARATOR, or OTHER.
+    each line as GREETING, BODY, CLOSING, SIGNATURE, QUOTE, or OTHER.
+    Blank lines are filtered before feature extraction.
     """
 
-    def extract(self, analysis: StructuralAnalysis) -> ExtractedFeatures:
-        """Extract features from structurally analyzed email.
+    def extract(
+        self,
+        analysis: StructuralAnalysis,
+        filtered: FilteredContent,
+    ) -> ExtractedFeatures:
+        """Extract features from content-only structural analysis.
 
         Args:
-            analysis: Output from StructuralAnalyzer.
+            analysis: Output from StructuralAnalyzer.analyze_filtered().
+            filtered: Output from ContentFilter (provides whitespace context).
 
         Returns:
             ExtractedFeatures with per-line feature vectors.
         """
         lines = analysis.lines
+        content_lines = filtered.content_lines
         total_lines = len(lines)
 
         if total_lines == 0:
@@ -142,6 +158,8 @@ class FeatureExtractor:
         feature_list: list[LineFeatures] = []
 
         for idx, annotated_line in enumerate(lines):
+            content_line = content_lines[idx]
+
             features = self._extract_line_features(
                 annotated_line=annotated_line,
                 idx=idx,
@@ -150,6 +168,8 @@ class FeatureExtractor:
                 last_quote_index=analysis.last_quote_index,
                 all_lines=lines,
                 all_flags=line_flags,
+                blank_lines_before=content_line.blank_lines_before,
+                blank_lines_after=content_line.blank_lines_after,
             )
             feature_list.append(features)
 
@@ -167,11 +187,13 @@ class FeatureExtractor:
         last_quote_index: int | None,
         all_lines: tuple[AnnotatedLine, ...],
         all_flags: list[dict[str, bool]],
+        blank_lines_before: int,
+        blank_lines_after: int,
     ) -> LineFeatures:
-        """Extract features for a single line."""
+        """Extract features for a single content line."""
         text = annotated_line.text
 
-        # Positional features
+        # Positional features (using content line indices)
         position_normalized = idx / max(total_lines - 1, 1)
         position_reverse = 1.0 - position_normalized
         lines_from_start = idx
@@ -193,12 +215,11 @@ class FeatureExtractor:
         char_ratios = self._compute_character_ratios(text)
         leading_whitespace = len(text) - len(text.lstrip())
         trailing_whitespace = len(text) - len(text.rstrip())
-        is_blank = text.strip() == ""
 
         # Pattern flags
         flags = all_flags[idx]
 
-        # Contextual features (window ±2)
+        # Contextual features (window ±2 content lines)
         context = self._compute_context_features(idx, all_lines, all_flags)
 
         return LineFeatures(
@@ -219,7 +240,9 @@ class FeatureExtractor:
             symbol_ratio=char_ratios["symbol"],
             leading_whitespace=leading_whitespace,
             trailing_whitespace=trailing_whitespace,
-            is_blank=is_blank,
+            # Whitespace context
+            blank_lines_before=blank_lines_before,
+            blank_lines_after=blank_lines_after,
             # Structural (from AnnotatedLine)
             quote_depth=annotated_line.quote_depth,
             is_forward_reply_header=annotated_line.is_forward_reply_header,
@@ -239,13 +262,12 @@ class FeatureExtractor:
             context_greeting_count=context["greeting_count"],
             context_closing_count=context["closing_count"],
             context_contact_count=context["contact_count"],
-            context_blank_count=context["blank_count"],
             context_quote_count=context["quote_count"],
             context_separator_count=context["separator_count"],
         )
 
     def _compute_pattern_flags(self, annotated_line: AnnotatedLine) -> dict[str, bool]:
-        """Compute pattern flags for a line."""
+        """Compute pattern flags for a content line."""
         text = annotated_line.text
 
         return {
@@ -258,7 +280,6 @@ class FeatureExtractor:
             "is_visual_separator": is_visual_separator_line(text),
             "has_meta_discussion": self._has_meta_discussion(text),
             "is_inside_quotation_marks": self._is_inside_quotation_marks(text),
-            "is_blank": text.strip() == "",
         }
 
     def _compute_character_ratios(self, text: str) -> dict[str, float]:
@@ -349,7 +370,7 @@ class FeatureExtractor:
         all_lines: tuple[AnnotatedLine, ...],
         all_flags: list[dict[str, bool]],
     ) -> dict[str, int]:
-        """Compute contextual features from surrounding lines (window ±2)."""
+        """Compute contextual features from surrounding content lines (window ±2)."""
         total = len(all_lines)
 
         # Define window bounds
@@ -360,7 +381,6 @@ class FeatureExtractor:
         greeting_count = 0
         closing_count = 0
         contact_count = 0
-        blank_count = 0
         quote_count = 0
         separator_count = 0
 
@@ -377,8 +397,6 @@ class FeatureExtractor:
                 closing_count += 1
             if flags["has_contact_info"]:
                 contact_count += 1
-            if flags["is_blank"]:
-                blank_count += 1
             if line.quote_depth > 0:
                 quote_count += 1
             if flags["is_visual_separator"] or line.is_delimiter:
@@ -388,7 +406,6 @@ class FeatureExtractor:
             "greeting_count": greeting_count,
             "closing_count": closing_count,
             "contact_count": contact_count,
-            "blank_count": blank_count,
             "quote_count": quote_count,
             "separator_count": separator_count,
         }

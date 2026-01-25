@@ -10,6 +10,7 @@ from yomail import (
     ExtractionResult,
     InvalidInputError,
 )
+from yomail.pipeline.content_filter import ContentFilter
 from yomail.pipeline.crf import CRFTrainer, Label
 from yomail.pipeline.features import FeatureExtractor
 from yomail.pipeline.normalizer import Normalizer
@@ -19,10 +20,13 @@ from yomail.pipeline.structural import StructuralAnalyzer
 def _train_test_model(model_path: Path) -> None:
     """Train a minimal model for testing."""
     normalizer = Normalizer()
+    content_filter = ContentFilter()
     analyzer = StructuralAnalyzer()
     extractor = FeatureExtractor()
     trainer = CRFTrainer(max_iterations=50)
 
+    # Training data: (text, content_labels)
+    # Labels are for content lines only (blank lines are filtered out)
     examples: list[tuple[str, tuple[Label, ...]]] = [
         (
             "お世話になっております。\n本日は会議の件でご連絡いたします。\nよろしくお願いいたします。",
@@ -41,16 +45,18 @@ def _train_test_model(model_path: Path) -> None:
             ("QUOTE", "BODY"),
         ),
         (
-            "情報です。\n\n以上",
-            ("BODY", "SEPARATOR", "OTHER"),
+            "情報です。\n続きです。\n以上",
+            ("BODY", "BODY", "CLOSING"),
         ),
     ]
 
     for text, labels in examples:
         normalized = normalizer.normalize(text)
-        structural = analyzer.analyze(normalized)
-        features = extractor.extract(structural)
-        trainer.add_sequence(features, normalized.lines, labels)
+        filtered = content_filter.filter(normalized)
+        structural = analyzer.analyze(filtered)
+        features = extractor.extract(structural, filtered)
+        content_texts = tuple(line.text for line in filtered.content_lines)
+        trainer.add_sequence(features, content_texts, labels)
 
     trainer.train(model_path)
 

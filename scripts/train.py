@@ -18,6 +18,7 @@ from pathlib import Path
 # Add src to path for development
 sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
+from yomail.pipeline.content_filter import ContentFilter
 from yomail.pipeline.crf import CRFTrainer, Label, LABELS
 from yomail.pipeline.features import FeatureExtractor
 from yomail.pipeline.normalizer import Normalizer
@@ -121,6 +122,7 @@ def main():
 
     # Initialize pipeline components
     normalizer = Normalizer()
+    content_filter = ContentFilter()
     structural_analyzer = StructuralAnalyzer()
     feature_extractor = FeatureExtractor()
     trainer = CRFTrainer(
@@ -146,8 +148,6 @@ def main():
             labels = validate_labels([item["label"] for item in lines_data])
 
             # Run through pipeline
-            # Note: We use the raw texts, not the normalized ones,
-            # because the training data should already have matching line structure
             normalized = normalizer.normalize(email_text)
 
             # Verify line count matches
@@ -159,14 +159,33 @@ def main():
                 failed += 1
                 continue
 
-            structural = structural_analyzer.analyze(normalized)
-            features = feature_extractor.extract(structural)
+            # Filter to content lines only
+            filtered = content_filter.filter(normalized)
+
+            # Filter labels to match content lines (skip labels for blank lines)
+            content_labels = tuple(
+                labels[idx] for idx in range(len(labels))
+                if idx not in filtered.whitespace_map.blank_positions
+            )
+
+            # Verify content line count matches filtered labels
+            if len(filtered.content_lines) != len(content_labels):
+                print(
+                    f"Warning: Example {i+1} has {len(filtered.content_lines)} content lines "
+                    f"but {len(content_labels)} content labels. Skipping."
+                )
+                failed += 1
+                continue
+
+            structural = structural_analyzer.analyze(filtered)
+            features = feature_extractor.extract(structural, filtered)
 
             # Add to trainer
-            trainer.add_sequence(features, normalized.lines, tuple(labels))
+            content_texts = tuple(line.text for line in filtered.content_lines)
+            trainer.add_sequence(features, content_texts, content_labels)
 
-            # Count labels
-            for label in labels:
+            # Count labels (content labels only for accurate stats)
+            for label in content_labels:
                 label_counts[label] += 1
 
             successful += 1

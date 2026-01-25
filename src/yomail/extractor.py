@@ -18,6 +18,7 @@ from yomail.exceptions import (
 )
 from yomail.pipeline.assembler import BodyAssembler
 from yomail.pipeline.confidence import ConfidenceGate
+from yomail.pipeline.content_filter import ContentFilter
 from yomail.pipeline.crf import CRFSequenceLabeler, LabeledLine
 from yomail.pipeline.features import FeatureExtractor
 from yomail.pipeline.normalizer import Normalizer
@@ -86,6 +87,7 @@ class EmailBodyExtractor:
         """
         # Pipeline components
         self._normalizer = Normalizer()
+        self._content_filter = ContentFilter()
         self._structural_analyzer = StructuralAnalyzer()
         self._feature_extractor = FeatureExtractor()
         self._crf_labeler = CRFSequenceLabeler(model_path)
@@ -185,19 +187,34 @@ class EmailBodyExtractor:
                     inline_quotes_included=0,
                 )
 
-            # Step 2: Structural analysis
-            structural = self._structural_analyzer.analyze(normalized)
+            # Step 2: Filter content lines (remove blanks)
+            filtered = self._content_filter.filter(normalized)
 
-            # Step 3: Feature extraction
-            features = self._feature_extractor.extract(structural)
+            if not filtered.content_lines:
+                return ExtractionResult(
+                    body=None,
+                    confidence=0.0,
+                    success=False,
+                    error=InvalidInputError(message="No content lines after filtering"),
+                    labeled_lines=(),
+                    signature_detected=False,
+                    inline_quotes_included=0,
+                )
 
-            # Step 4: CRF labeling
-            labeling = self._crf_labeler.predict(features, normalized.lines)
+            # Step 3: Structural analysis (on content lines only)
+            structural = self._structural_analyzer.analyze(filtered)
 
-            # Step 5: Body assembly
+            # Step 4: Feature extraction
+            features = self._feature_extractor.extract(structural, filtered)
+
+            # Step 5: CRF labeling (content lines only)
+            content_texts = tuple(line.text for line in filtered.content_lines)
+            labeling = self._crf_labeler.predict(features, content_texts)
+
+            # Step 6: Body assembly
             assembled = self._body_assembler.assemble(labeling)
 
-            # Step 6: Confidence check
+            # Step 7: Confidence check
             confidence_result = self._confidence_gate.compute(labeling, assembled)
 
             # Determine success and error

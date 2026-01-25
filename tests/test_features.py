@@ -1,17 +1,20 @@
 """Tests for the FeatureExtractor component."""
 
 from yomail import FeatureExtractor, Normalizer, StructuralAnalyzer
+from yomail.pipeline.content_filter import ContentFilter
 
 
 def _extract_features(text: str):
     """Helper to run the full pipeline and extract features."""
     normalizer = Normalizer()
+    content_filter = ContentFilter()
     analyzer = StructuralAnalyzer()
     extractor = FeatureExtractor()
 
     normalized = normalizer.normalize(text)
-    analysis = analyzer.analyze(normalized)
-    return extractor.extract(analysis)
+    filtered = content_filter.filter(normalized)
+    analysis = analyzer.analyze(filtered)
+    return extractor.extract(analysis, filtered)
 
 
 class TestPositionalFeatures:
@@ -74,19 +77,25 @@ class TestContentFeatures:
 
         assert result.line_features[0].line_length == 5
 
-    def test_blank_line_detection(self) -> None:
-        """Blank lines are detected."""
+    def test_blank_lines_tracked_as_context(self) -> None:
+        """Blank lines are tracked via blank_lines_before/after."""
         result = _extract_features("Text\n\nMore text")
 
-        assert result.line_features[0].is_blank is False
-        assert result.line_features[1].is_blank is True
-        assert result.line_features[2].is_blank is False
+        # After filtering, we have 2 content lines
+        assert len(result.line_features) == 2
+        # First line ("Text") has 1 blank after it
+        assert result.line_features[0].blank_lines_after == 1
+        # Second line ("More text") has 1 blank before it
+        assert result.line_features[1].blank_lines_before == 1
 
-    def test_whitespace_only_is_blank(self) -> None:
-        """Whitespace-only lines are blank."""
+    def test_whitespace_only_filtered_out(self) -> None:
+        """Whitespace-only lines are filtered out, tracked via context."""
         result = _extract_features("Text\n   \nMore")
 
-        assert result.line_features[1].is_blank is True
+        # Only 2 content lines after filtering
+        assert len(result.line_features) == 2
+        assert result.line_features[0].blank_lines_after == 1
+        assert result.line_features[1].blank_lines_before == 1
 
     def test_leading_trailing_whitespace(self) -> None:
         """Whitespace counts are non-negative."""
@@ -134,13 +143,15 @@ class TestContentFeatures:
         assert 0.2 < features.kanji_ratio < 0.4  # ~28%
         assert 0.6 < features.ascii_ratio < 0.8  # ~71%
 
-    def test_empty_line_zero_ratios(self) -> None:
-        """Empty line has zero ratios."""
+    def test_content_lines_only_no_empty(self) -> None:
+        """Empty lines are filtered out, only content lines remain."""
         result = _extract_features("Text\n\nMore")
 
-        features = result.line_features[1]  # Empty line
-        assert features.kanji_ratio == 0.0
-        assert features.ascii_ratio == 0.0
+        # After filtering, only 2 content lines remain
+        assert len(result.line_features) == 2
+        # First line is "Text", second is "More"
+        assert result.line_features[0].line_length == 4
+        assert result.line_features[1].line_length == 4
 
 
 class TestStructuralFeatures:
@@ -251,13 +262,16 @@ class TestContextualFeatures:
         # Middle line should see 2 greetings in its context
         assert result.line_features[1].context_greeting_count == 2
 
-    def test_context_blank_count(self) -> None:
-        """Blank line count in context window."""
+    def test_blank_line_context_features(self) -> None:
+        """Blank lines tracked via blank_lines_before/after."""
         text = "\n\nText\n\n"
         result = _extract_features(text)
 
-        # Middle line (Text) should see blank lines
-        assert result.line_features[2].context_blank_count >= 2
+        # Only one content line after filtering
+        assert len(result.line_features) == 1
+        # "Text" has 2 blanks before and 2 blanks after
+        assert result.line_features[0].blank_lines_before == 2
+        assert result.line_features[0].blank_lines_after == 2
 
     def test_context_quote_count(self) -> None:
         """Quote count in context window."""
@@ -349,17 +363,18 @@ On 2024/01/15, Tanaka wrote:
         ]
         assert len(non_quote_with_context) >= 1
 
-    def test_empty_result_for_empty_analysis(self) -> None:
-        """Empty analysis produces empty features."""
-        # This tests the edge case handling
+    def test_minimal_input_features(self) -> None:
+        """Minimal input produces expected features."""
         normalizer = Normalizer()
+        content_filter = ContentFilter()
         analyzer = StructuralAnalyzer()
         extractor = FeatureExtractor()
 
         # Normalize a minimal valid input
         normalized = normalizer.normalize("x")
-        analysis = analyzer.analyze(normalized)
-        result = extractor.extract(analysis)
+        filtered = content_filter.filter(normalized)
+        analysis = analyzer.analyze(filtered)
+        result = extractor.extract(analysis, filtered)
 
         assert result.total_lines == 1
 

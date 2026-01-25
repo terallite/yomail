@@ -100,7 +100,10 @@ def _features_to_dict(features: LineFeatures, idx: int, total_lines: int) -> dic
     feat["symbol_ratio"] = features.symbol_ratio
     feat["leading_ws"] = float(features.leading_whitespace)
     feat["trailing_ws"] = float(features.trailing_whitespace)
-    feat["is_blank"] = features.is_blank
+
+    # Whitespace context features
+    feat["blank_lines_before"] = float(features.blank_lines_before)
+    feat["blank_lines_after"] = float(features.blank_lines_after)
 
     # Structural features
     feat["quote_depth"] = float(features.quote_depth)
@@ -123,7 +126,6 @@ def _features_to_dict(features: LineFeatures, idx: int, total_lines: int) -> dic
     feat["ctx_greeting_count"] = float(features.context_greeting_count)
     feat["ctx_closing_count"] = float(features.context_closing_count)
     feat["ctx_contact_count"] = float(features.context_contact_count)
-    feat["ctx_blank_count"] = float(features.context_blank_count)
     feat["ctx_quote_count"] = float(features.context_quote_count)
     feat["ctx_separator_count"] = float(features.context_separator_count)
 
@@ -145,10 +147,8 @@ def _features_to_dict(features: LineFeatures, idx: int, total_lines: int) -> dic
     else:
         feat["pos_bucket"] = "end"
 
-    # Character composition bucket
-    if features.is_blank:
-        feat["char_type"] = "blank"
-    elif features.ascii_ratio > 0.8:
+    # Character composition bucket (content lines only, no blank option)
+    if features.ascii_ratio > 0.8:
         feat["char_type"] = "ascii_heavy"
     elif features.kanji_ratio + features.hiragana_ratio > 0.7:
         feat["char_type"] = "japanese_heavy"

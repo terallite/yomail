@@ -14,6 +14,7 @@ from yomail.pipeline.crf import (
     SequenceLabelingResult,
     _features_to_dict,
 )
+from yomail.pipeline.content_filter import ContentFilter
 from yomail.pipeline.features import ExtractedFeatures, FeatureExtractor, LineFeatures
 from yomail.pipeline.normalizer import Normalizer
 from yomail.pipeline.structural import StructuralAnalyzer
@@ -35,7 +36,8 @@ def _make_line_features(
     symbol_ratio: float = 0.05,
     leading_whitespace: int = 0,
     trailing_whitespace: int = 0,
-    is_blank: bool = False,
+    blank_lines_before: int = 0,
+    blank_lines_after: int = 0,
     quote_depth: int = 0,
     is_forward_reply_header: bool = False,
     preceded_by_delimiter: bool = False,
@@ -52,7 +54,6 @@ def _make_line_features(
     context_greeting_count: int = 0,
     context_closing_count: int = 0,
     context_contact_count: int = 0,
-    context_blank_count: int = 0,
     context_quote_count: int = 0,
     context_separator_count: int = 0,
 ) -> LineFeatures:
@@ -73,7 +74,8 @@ def _make_line_features(
         symbol_ratio=symbol_ratio,
         leading_whitespace=leading_whitespace,
         trailing_whitespace=trailing_whitespace,
-        is_blank=is_blank,
+        blank_lines_before=blank_lines_before,
+        blank_lines_after=blank_lines_after,
         quote_depth=quote_depth,
         is_forward_reply_header=is_forward_reply_header,
         preceded_by_delimiter=preceded_by_delimiter,
@@ -90,7 +92,6 @@ def _make_line_features(
         context_greeting_count=context_greeting_count,
         context_closing_count=context_closing_count,
         context_contact_count=context_contact_count,
-        context_blank_count=context_blank_count,
         context_quote_count=context_quote_count,
         context_separator_count=context_separator_count,
     )
@@ -99,13 +100,16 @@ def _make_line_features(
 def _extract_features(text: str) -> tuple[ExtractedFeatures, tuple[str, ...]]:
     """Run the full pipeline up to feature extraction."""
     normalizer = Normalizer()
+    content_filter = ContentFilter()
     analyzer = StructuralAnalyzer()
     extractor = FeatureExtractor()
 
     normalized = normalizer.normalize(text)
-    analysis = analyzer.analyze(normalized)
-    features = extractor.extract(analysis)
-    return features, normalized.lines
+    filtered = content_filter.filter(normalized)
+    analysis = analyzer.analyze(filtered)
+    features = extractor.extract(analysis, filtered)
+    content_texts = tuple(line.text for line in filtered.content_lines)
+    return features, content_texts
 
 
 class TestFeatureConversion:
@@ -170,13 +174,13 @@ class TestFeatureConversion:
 
     def test_char_type_categorical(self) -> None:
         """Character composition is categorized."""
-        blank = _make_line_features(is_blank=True)
         ascii_heavy = _make_line_features(ascii_ratio=0.9, kanji_ratio=0.0, hiragana_ratio=0.0)
         japanese = _make_line_features(kanji_ratio=0.5, hiragana_ratio=0.3, ascii_ratio=0.1)
+        mixed = _make_line_features(kanji_ratio=0.3, hiragana_ratio=0.2, ascii_ratio=0.4)
 
-        assert _features_to_dict(blank, 0, 1)["char_type"] == "blank"
         assert _features_to_dict(ascii_heavy, 0, 1)["char_type"] == "ascii_heavy"
         assert _features_to_dict(japanese, 0, 1)["char_type"] == "japanese_heavy"
+        assert _features_to_dict(mixed, 0, 1)["char_type"] == "mixed"
 
 
 class TestCRFSequenceLabeler:
@@ -308,10 +312,10 @@ def _train_minimal_model(model_path: Path) -> None:
             "> 前回のメール\n承知しました。",
             ("QUOTE", "BODY"),
         ),
-        # Separator and Other
+        # Multiple body lines (blank lines are filtered out before labeling)
         (
-            "情報です。\n\n以上",
-            ("BODY", "SEPARATOR", "OTHER"),
+            "情報です。\n続きです。\n以上",
+            ("BODY", "BODY", "CLOSING"),
         ),
     ]
 

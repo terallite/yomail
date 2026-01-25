@@ -6,10 +6,14 @@ Analyzes the structure of normalized email text:
 - Forward/reply header detection
 """
 
+from __future__ import annotations
+
 import re
 from dataclasses import dataclass
+from typing import TYPE_CHECKING
 
-from yomail.pipeline.normalizer import NormalizedEmail
+if TYPE_CHECKING:
+    from yomail.pipeline.content_filter import FilteredContent
 
 
 @dataclass(frozen=True, slots=True)
@@ -97,22 +101,22 @@ _DELIMITER_PATTERNS: tuple[re.Pattern[str], ...] = (
 class StructuralAnalyzer:
     """Analyzes email structure for quote detection and segmentation.
 
-    Processes normalized email text to identify:
+    Processes content-only lines (blank lines filtered) to identify:
     - Quote depth per line (from markers like > or |)
     - Forward/reply attribution headers
     - Visual delimiter lines that separate sections
     """
 
-    def analyze(self, normalized: NormalizedEmail) -> StructuralAnalysis:
-        """Analyze the structural elements of normalized email text.
+    def analyze(self, filtered: FilteredContent) -> StructuralAnalysis:
+        """Analyze structural elements of content-only lines.
 
         Args:
-            normalized: Output from the Normalizer component.
+            filtered: Output from ContentFilter.
 
         Returns:
-            StructuralAnalysis with annotated lines and summary information.
+            StructuralAnalysis with annotated content lines.
         """
-        lines = normalized.lines
+        content_lines = filtered.content_lines
         annotated: list[AnnotatedLine] = []
 
         first_quote_index: int | None = None
@@ -121,7 +125,8 @@ class StructuralAnalyzer:
 
         previous_is_delimiter = False
 
-        for index, text in enumerate(lines):
+        for index, content_line in enumerate(content_lines):
+            text = content_line.text
             quote_depth = self._compute_quote_depth(text)
             is_delimiter = self._is_delimiter_line(text)
             is_forward_reply_header = self._is_forward_reply_header(text)
@@ -137,7 +142,7 @@ class StructuralAnalyzer:
             annotated.append(
                 AnnotatedLine(
                     text=text,
-                    line_index=index,
+                    line_index=index,  # Content line index, not original
                     quote_depth=quote_depth,
                     is_forward_reply_header=is_forward_reply_header,
                     preceded_by_delimiter=previous_is_delimiter,
