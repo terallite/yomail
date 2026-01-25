@@ -120,12 +120,19 @@ def is_name_line(line: str) -> bool:
     if len(stripped) <= 15 and not any(c in stripped for c in "。、！？!?,.:;"):
         last_names, first_names, katakana_names, romaji_names = _get_name_sets()
 
-        # Check for full name (last + first)
+        # Check for full name (last + first, Japanese order)
         for last in last_names:
             if stripped.startswith(last):
                 remainder = stripped[len(last):]
                 # Remainder should be a first name or empty (last name only)
                 if not remainder or remainder in first_names:
+                    return True
+
+        # Check for full name (first + last, Western order)
+        for first in first_names:
+            if stripped.startswith(first):
+                remainder = stripped[len(first):]
+                if remainder in last_names:
                     return True
 
         # Check for katakana name

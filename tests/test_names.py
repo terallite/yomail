@@ -41,6 +41,12 @@ class TestIsNameLine:
         assert is_name_line("新井辰夫")
         assert is_name_line("秋山竜太")
 
+    def test_name_western_order(self) -> None:
+        """Names in first+last (Western) order are detected."""
+        assert is_name_line("紅星平岡")  # first=紅星, last=平岡
+        assert is_name_line("琉生望月")  # first=琉生, last=望月
+        assert is_name_line("早英野中")  # first=早英, last=野中
+
     # === Negative cases: Should NOT detect as names ===
 
     def test_casual_closing_not_name(self) -> None:
