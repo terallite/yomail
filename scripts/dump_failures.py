@@ -221,11 +221,14 @@ def main():
             predicted = ex["predicted"]
             ground_truth = ex["ground_truth"]
 
-            # Align by normalized text (predicted is normalized, ground truth is not)
+            # Filter ground truth to content lines only (to align with content-only predictions)
+            ground_truth_content = [
+                (text, label) for text, label in ground_truth if text.strip()
+            ]
+
             for j, (pred_text, pred_label, pred_conf) in enumerate(predicted):
-                # Find matching ground truth (same index, since normalization preserves line count)
-                if j < len(ground_truth):
-                    gt_text, gt_label = ground_truth[j]
+                if j < len(ground_truth_content):
+                    gt_text, gt_label = ground_truth_content[j]
                 else:
                     gt_label = "?"
 

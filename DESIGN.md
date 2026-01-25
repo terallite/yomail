@@ -232,7 +232,6 @@ _Contextual (window ±2 lines):_
 | CLOSING   | Closing formulas (よろしくお願いいたします, 敬具, etc.) |
 | SIGNATURE | Signature block lines                                   |
 | QUOTE     | Quoted content (any depth)                              |
-| SEPARATOR | Visual dividers, blank lines                            |
 | OTHER     | Headers, noise, unclassifiable                          |
 
 **Model characteristics:**
@@ -260,7 +259,7 @@ _Contextual (window ±2 lines):_
 
 3. **Build content blocks:**
    - BODY lines accumulate into current block
-   - SEPARATOR and OTHER lines are buffered; included if followed by more content (neutral filler)
+   - OTHER lines are buffered; included if followed by more content (neutral filler)
    - Inline QUOTE lines are included in current block
    - GREETING and CLOSING lines are included if adjacent to BODY
    - Trailing/leading QUOTE lines create hard breaks
@@ -709,8 +708,8 @@ Expected transition probabilities (to guide training interpretation):
 | SIGNATURE → SIGNATURE | Very high                       |
 | SIGNATURE → BODY      | Very low (key constraint)       |
 | QUOTE → QUOTE         | Very high                       |
-| SEPARATOR → BODY      | Medium                          |
-| SEPARATOR → SIGNATURE | Medium                          |
+| OTHER → BODY          | Medium                          |
+| OTHER → SIGNATURE     | Medium                          |
 
 ---
 
