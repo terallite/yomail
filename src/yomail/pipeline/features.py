@@ -19,11 +19,11 @@ from typing import TYPE_CHECKING, Sequence
 from yomail.patterns.closings import is_closing_line
 from yomail.patterns.greetings import is_greeting_line
 from yomail.patterns.names import is_name_line
+from yomail.patterns.separators import is_separator_line
 from yomail.patterns.signatures import (
     is_company_line,
     is_contact_info_line,
     is_position_line,
-    is_visual_separator_line,
 )
 from yomail.pipeline.structural import AnnotatedLine, StructuralAnalysis
 
@@ -428,7 +428,7 @@ class FeatureExtractor:
             "has_company_pattern": is_company_line(text),
             "has_position_pattern": is_position_line(text),
             "has_name_pattern": is_name_line(text),
-            "is_visual_separator": is_visual_separator_line(text),
+            "is_visual_separator": is_separator_line(text),
             "has_meta_discussion": self._has_meta_discussion(text),
             "is_inside_quotation_marks": self._is_inside_quotation_marks(text),
         }

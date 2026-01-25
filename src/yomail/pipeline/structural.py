@@ -12,6 +12,8 @@ import re
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
+from yomail.patterns.separators import is_separator_line
+
 if TYPE_CHECKING:
     from yomail.pipeline.content_filter import FilteredContent
 
@@ -84,18 +86,6 @@ _FORWARD_REPLY_PATTERNS: tuple[re.Pattern[str], ...] = (
     re.compile(r"^件名:\s+.+$"),
 )
 
-# Delimiter line patterns - visual separators
-# These are different characters (not width variants), so we need multiple patterns
-_DELIMITER_PATTERNS: tuple[re.Pattern[str], ...] = (
-    re.compile(r"^[-]{3,}$"),  # Hyphen-minus
-    re.compile(r"^[─]{3,}$"),  # Box drawing horizontal
-    re.compile(r"^[━]{3,}$"),  # Box drawing heavy horizontal
-    re.compile(r"^[=]{3,}$"),  # Equals sign
-    re.compile(r"^[_]{3,}$"),  # Underscore
-    re.compile(r"^[*]{3,}$"),  # Asterisk
-    re.compile(r"^[~]{3,}$"),  # Tilde
-    re.compile(r"^[-─━=_*~\s]{3,}$"),  # Mixed separators
-)
 
 
 class StructuralAnalyzer:
@@ -191,11 +181,7 @@ class StructuralAnalyzer:
         Returns:
             True if the line is a visual delimiter.
         """
-        stripped = line.strip()
-        if not stripped:
-            return False
-
-        return any(pattern.match(stripped) for pattern in _DELIMITER_PATTERNS)
+        return is_separator_line(line)
 
     def _is_forward_reply_header(self, line: str) -> bool:
         """Check if a line is a forward/reply attribution header.

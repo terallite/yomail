@@ -1,59 +1,14 @@
 """Japanese email signature pattern detection.
 
 Patterns for detecting:
-- Visual separator lines (---, ===, etc.)
 - Contact information (phone, fax, email, URL, postal code)
 - Company names and suffixes
 - Position/title patterns
+
+Note: Visual separator detection is in separators.py
 """
 
 import re
-
-# Visual separator patterns
-# These are different characters (not just width variants), so we need multiple
-_VISUAL_SEPARATOR_PATTERNS: tuple[re.Pattern[str], ...] = (
-    re.compile(r"^[-]{3,}$"),  # Hyphen-minus
-    re.compile(r"^[─]{3,}$"),  # Box drawing horizontal
-    re.compile(r"^[━]{3,}$"),  # Box drawing heavy horizontal
-    re.compile(r"^[=]{3,}$"),  # Equals sign
-    re.compile(r"^[_]{3,}$"),  # Underscore
-    re.compile(r"^[*]{3,}$"),  # Asterisk
-    re.compile(r"^[~]{3,}$"),  # Tilde
-    re.compile(r"^[-─━=_*~\s]{3,}$"),  # Mixed separators
-)
-
-# Separator characters for decorated separator detection
-_SEPARATOR_CHARS = frozenset("-─━=_*~")
-
-
-def _is_decorated_separator(line: str) -> bool:
-    """Check if a line is a decorated separator (e.g., ★-----★).
-
-    A decorated separator has:
-    - At least 3 separator characters (-=_*~ etc.)
-    - Separator chars make up at least 50% of the line
-    - Optional decorative characters at start/end
-
-    Args:
-        line: A stripped line of text.
-
-    Returns:
-        True if the line is a decorated separator.
-    """
-    if len(line) < 3:
-        return False
-
-    separator_count = sum(1 for c in line if c in _SEPARATOR_CHARS)
-
-    # Need at least 3 separator characters
-    if separator_count < 3:
-        return False
-
-    # Separator chars must be at least 50% of the line
-    if separator_count / len(line) < 0.5:
-        return False
-
-    return True
 
 # Contact information patterns
 _CONTACT_PATTERNS: tuple[re.Pattern[str], ...] = (
@@ -127,29 +82,6 @@ _POSITION_PATTERNS: tuple[re.Pattern[str], ...] = (
     re.compile(r"Director", re.IGNORECASE),
     re.compile(r"Engineer", re.IGNORECASE),
 )
-
-
-def is_visual_separator_line(line: str) -> bool:
-    """Check if a line is a visual separator.
-
-    Recognizes both pure separators (---, ===) and decorated separators (★-----★).
-
-    Args:
-        line: A single normalized line of text.
-
-    Returns:
-        True if the line is a visual separator.
-    """
-    stripped = line.strip()
-    if not stripped:
-        return False
-
-    # Check pure separator patterns first
-    if any(pattern.match(stripped) for pattern in _VISUAL_SEPARATOR_PATTERNS):
-        return True
-
-    # Check decorated separators (e.g., ★-----★)
-    return _is_decorated_separator(stripped)
 
 
 def is_contact_info_line(line: str) -> bool:
