@@ -328,3 +328,149 @@ def _train_minimal_model(model_path: Path) -> None:
         trainer.add_sequence(features, texts, labels)
 
     trainer.train(model_path)
+
+
+class TestUnifyBracketedBlocks:
+    """Tests for _unify_bracketed_blocks post-processing."""
+
+    def _make_extracted_features(
+        self, separator_positions: list[int], total: int
+    ) -> ExtractedFeatures:
+        """Create ExtractedFeatures with separators at specified positions."""
+        features = []
+        for i in range(total):
+            is_sep = i in separator_positions
+            features.append(
+                _make_line_features(
+                    is_visual_separator=is_sep,
+                    is_delimiter=False,
+                )
+            )
+        return ExtractedFeatures(line_features=tuple(features), total_lines=total)
+
+    def test_majority_body_unifies_to_body(self) -> None:
+        """Block with majority BODY labels unifies to BODY."""
+        labeler = CRFSequenceLabeler()
+        # Block: sep(0), BODY(1), BODY(2), CLOSING(3), sep(4)
+        # 2 BODY, 1 CLOSING, 2 separators = 5 total, need BODY majority
+        labels = ["SIGNATURE", "BODY", "BODY", "CLOSING", "SIGNATURE"]
+        extracted = self._make_extracted_features([0, 4], 5)
+
+        result = labeler._unify_bracketed_blocks(labels, extracted)
+
+        # With 2 BODY, 1 CLOSING, 2 SIGNATURE → no clear majority > 50%
+        # Actually: 2 SIGNATURE (40%), 2 BODY (40%), 1 CLOSING (20%)
+        # No label has > 50%, so no unification
+        assert result == labels
+
+    def test_majority_body_unifies_when_over_half(self) -> None:
+        """Block with > 50% BODY labels unifies to BODY."""
+        labeler = CRFSequenceLabeler()
+        # Block: sep(0), BODY(1), BODY(2), BODY(3), CLOSING(4), sep(5)
+        # 3 BODY out of 6 = 50%, not > 50%, so no change
+        labels = ["OTHER", "BODY", "BODY", "BODY", "CLOSING", "OTHER"]
+        extracted = self._make_extracted_features([0, 5], 6)
+
+        result = labeler._unify_bracketed_blocks(labels, extracted)
+
+        # 3 BODY, 1 CLOSING, 2 OTHER = 6 total. BODY = 50%, not > 50%
+        assert result == labels
+
+    def test_clear_majority_body_unifies(self) -> None:
+        """Block with clear BODY majority unifies entire block."""
+        labeler = CRFSequenceLabeler()
+        # Block: sep(0), BODY(1), BODY(2), BODY(3), BODY(4), sep(5)
+        # 4 BODY out of 6 = 67% > 50%
+        labels = ["SIGNATURE", "BODY", "BODY", "BODY", "BODY", "SIGNATURE"]
+        extracted = self._make_extracted_features([0, 5], 6)
+
+        result = labeler._unify_bracketed_blocks(labels, extracted)
+
+        assert result == ["BODY", "BODY", "BODY", "BODY", "BODY", "BODY"]
+
+    def test_clear_majority_signature_unifies(self) -> None:
+        """Block with clear SIGNATURE majority unifies entire block."""
+        labeler = CRFSequenceLabeler()
+        # Block: sep(0), SIG(1), SIG(2), CLOSING(3), SIG(4), sep(5)
+        # 4 SIGNATURE out of 6 = 67% > 50%
+        labels = ["SIGNATURE", "SIGNATURE", "SIGNATURE", "CLOSING", "SIGNATURE", "SIGNATURE"]
+        extracted = self._make_extracted_features([0, 5], 6)
+
+        result = labeler._unify_bracketed_blocks(labels, extracted)
+
+        assert result == ["SIGNATURE"] * 6
+
+    def test_mixed_labels_no_change(self) -> None:
+        """Block with mixed labels and no majority stays unchanged."""
+        labeler = CRFSequenceLabeler()
+        # Block: sep(0), BODY(1), CLOSING(2), SIG(3), sep(4)
+        # 1 BODY, 1 CLOSING, 1 SIG, 2 sep labels → no majority
+        labels = ["OTHER", "BODY", "CLOSING", "SIGNATURE", "OTHER"]
+        extracted = self._make_extracted_features([0, 4], 5)
+
+        result = labeler._unify_bracketed_blocks(labels, extracted)
+
+        assert result == labels
+
+    def test_no_separators_no_change(self) -> None:
+        """Without separators, no unification happens."""
+        labeler = CRFSequenceLabeler()
+        labels = ["BODY", "BODY", "CLOSING", "SIGNATURE"]
+        extracted = self._make_extracted_features([], 4)
+
+        result = labeler._unify_bracketed_blocks(labels, extracted)
+
+        assert result == labels
+
+    def test_single_separator_no_change(self) -> None:
+        """With only one separator, no block can form."""
+        labeler = CRFSequenceLabeler()
+        labels = ["BODY", "BODY", "SIGNATURE", "SIGNATURE"]
+        extracted = self._make_extracted_features([2], 4)
+
+        result = labeler._unify_bracketed_blocks(labels, extracted)
+
+        assert result == labels
+
+    def test_adjacent_separators_no_block(self) -> None:
+        """Adjacent separators (no content between) don't form a block."""
+        labeler = CRFSequenceLabeler()
+        # Separators at 1 and 2 are adjacent → no content between
+        labels = ["BODY", "OTHER", "OTHER", "SIGNATURE"]
+        extracted = self._make_extracted_features([1, 2], 4)
+
+        result = labeler._unify_bracketed_blocks(labels, extracted)
+
+        assert result == labels
+
+    def test_too_few_lines_no_change(self) -> None:
+        """With fewer than 3 lines, no unification possible."""
+        labeler = CRFSequenceLabeler()
+        labels = ["BODY", "CLOSING"]
+        extracted = self._make_extracted_features([0, 1], 2)
+
+        result = labeler._unify_bracketed_blocks(labels, extracted)
+
+        assert result == labels
+
+    def test_delimiter_also_counts_as_separator(self) -> None:
+        """is_delimiter lines also form block boundaries."""
+        labeler = CRFSequenceLabeler()
+        # Use delimiters instead of visual separators
+        features = []
+        for i in range(5):
+            features.append(
+                _make_line_features(
+                    is_visual_separator=False,
+                    is_delimiter=(i == 0 or i == 4),
+                )
+            )
+        extracted = ExtractedFeatures(line_features=tuple(features), total_lines=5)
+
+        # Block: delim(0), SIG(1), SIG(2), SIG(3), delim(4) → 4 SIG, 1 delim → 80% SIG
+        labels = ["OTHER", "SIGNATURE", "SIGNATURE", "SIGNATURE", "OTHER"]
+
+        result = labeler._unify_bracketed_blocks(labels, extracted)
+
+        # 3 SIGNATURE, 2 OTHER = 5 total. SIGNATURE = 60% > 50%
+        assert result == ["SIGNATURE"] * 5

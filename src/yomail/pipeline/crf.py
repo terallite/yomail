@@ -293,6 +293,87 @@ class CRFSequenceLabeler:
 
         return fixed
 
+    def _unify_bracketed_blocks(
+        self, labels: list[str], extracted: ExtractedFeatures
+    ) -> list[str]:
+        """Unify labels within bracketed blocks (separator-sandwiched sections).
+
+        A bracketed block includes the opening separator, content lines, and
+        closing separator. If the majority of lines in the block are BODY,
+        the entire block becomes BODY. If the majority are SIGNATURE, the
+        entire block becomes SIGNATURE. Other cases are left unchanged.
+
+        This fixes cases where info blocks within signatures get mixed labels
+        due to CRF transition preferences.
+        """
+        if len(labels) < 3:
+            return labels
+
+        fixed = labels.copy()
+
+        # Find all separator positions
+        separator_indices: list[int] = []
+        for i, lf in enumerate(extracted.line_features):
+            if lf.is_delimiter or lf.is_visual_separator:
+                separator_indices.append(i)
+
+        if len(separator_indices) < 2:
+            return fixed
+
+        # Track which separators have been used as closers
+        used_as_closer: set[int] = set()
+
+        # For each potential opening separator, find matching closer
+        for i, open_idx in enumerate(separator_indices):
+            if open_idx in used_as_closer:
+                continue
+
+            # Look for a matching closer among remaining separators
+            for close_idx in separator_indices[i + 1:]:
+                if close_idx in used_as_closer:
+                    continue
+
+                # Need at least 1 content line between separators
+                if close_idx <= open_idx + 1:
+                    continue
+
+                # Found a potential block: [open_idx, close_idx] inclusive
+                block_indices = list(range(open_idx, close_idx + 1))
+
+                # Count BODY and SIGNATURE labels in the block
+                body_count = sum(1 for idx in block_indices if fixed[idx] == "BODY")
+                sig_count = sum(1 for idx in block_indices if fixed[idx] == "SIGNATURE")
+                total = len(block_indices)
+
+                # Majority rule: more than half must be BODY or SIGNATURE
+                if body_count > total / 2:
+                    # Unify to BODY
+                    for idx in block_indices:
+                        if fixed[idx] != "BODY":
+                            logger.debug(
+                                "Unified bracketed block: %s → BODY at position %d",
+                                fixed[idx],
+                                idx,
+                            )
+                            fixed[idx] = "BODY"
+                    used_as_closer.add(close_idx)
+                    break
+                elif sig_count > total / 2:
+                    # Unify to SIGNATURE
+                    for idx in block_indices:
+                        if fixed[idx] != "SIGNATURE":
+                            logger.debug(
+                                "Unified bracketed block: %s → SIGNATURE at position %d",
+                                fixed[idx],
+                                idx,
+                            )
+                            fixed[idx] = "SIGNATURE"
+                    used_as_closer.add(close_idx)
+                    break
+                # else: no clear majority, try next potential closer
+
+        return fixed
+
     def predict(
         self,
         extracted: ExtractedFeatures,
@@ -330,6 +411,9 @@ class CRFSequenceLabeler:
 
         # Fix impossible transitions
         predicted_labels = self._fix_impossible_transitions(predicted_labels, extracted)
+
+        # Unify bracketed blocks (separator-sandwiched sections)
+        predicted_labels = self._unify_bracketed_blocks(predicted_labels, extracted)
 
         # Get sequence probability (probability of the predicted sequence)
         sequence_prob = self._tagger.probability(predicted_labels)
