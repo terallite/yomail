@@ -1,6 +1,9 @@
 # ARCHITECTURE.md — yomail
 
-System architecture as-built. Last updated: 2026-01-25.
+System architecture as-built. Last updated: 2026-01-26.
+
+> **This is the authoritative documentation for the current implementation.**
+> For the original design specification, see [DESIGN.md](DESIGN.md).
 
 ## Overview
 
@@ -131,7 +134,7 @@ src/yomail/
 
 ## Feature Summary
 
-Features extracted per line (35 total):
+Features extracted per line (37 total):
 
 **Positional (6):**
 
@@ -172,13 +175,15 @@ Features extracted per line (35 total):
 
 - in_bracketed_section, bracket_has_signature_patterns
 
-**Derived Categorical (4, CRF only):**
+**Derived Categorical (CRF only, not in LineFeatures):**
 
 - BOS/EOS markers
 - pos_bucket (start/early/middle/late/end)
 - quote_depth_cat (quoted/unquoted)
 - char_type (ascii_heavy/japanese_heavy/mixed)
 - bracket_cat (bracketed/unbracketed)
+
+**Feature count breakdown:** 6 + 9 + 2 + 4 + 9 + 5 + 2 = 37 features in `LineFeatures` dataclass. Derived categorical features are added during CRF feature conversion.
 
 ## Post-Processing Rules
 

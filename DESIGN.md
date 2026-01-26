@@ -1,6 +1,12 @@
 # yomail (読メール): Japanese Email Body Extractor
 
-## Design Specification v1.0
+## Original Design Specification v1.0
+
+> **Note:** This document is the **original design specification** created before implementation. It is preserved for historical reference and to document the original requirements and design rationale.
+>
+> For the **current as-built implementation**, see [ARCHITECTURE.md](ARCHITECTURE.md).
+>
+> Key differences from implementation are documented in ARCHITECTURE.md's "Design Deviations" section.
 
 ---
 
@@ -113,362 +119,64 @@ Neural approaches require more data and risk overfitting to synthetic patterns. 
 
 ## 3. Component Specifications
 
-### 3.1 Normalizer
+> **See [ARCHITECTURE.md](ARCHITECTURE.md) for detailed as-built component specifications.**
 
-**Responsibilities:**
+The implementation includes these pipeline stages:
 
-- Detect and convert to UTF-8
-- Normalize line endings to `\n`
-- Apply neologdn normalization (handles Japanese-specific normalization)
-- Apply Unicode NFKC normalization (as secondary pass)
-- Preserve original line structure for downstream processing
+1. **Normalizer** — Line endings, neologdn, NFKC normalization
+2. **Content Filter** — Separates blank lines from content (added during implementation)
+3. **Structural Analyzer** — Quote depth, forward/reply headers
+4. **Feature Extractor** — 37 features per line for ML
+5. **CRF Sequence Labeler** — Per-line label prediction with post-processing
+6. **Reconstructor** — Reinserts blank lines (added during implementation)
+7. **Body Assembler** — Signature boundary detection, block building
+8. **Confidence Check** — Viterbi sequence probability threshold
 
-**neologdn normalization (via `neologdn.normalize()`):**
-
-- Full-width ASCII → half-width (Ａ→A, １→1, （→(, etc.)
-- Half-width katakana → full-width (ｶﾀｶﾅ→カタカナ)
-- Repeated prolonged sound marks (ーーー→ー)
-- Tilde/wave dash variants (~∼〜→〜)
-- Various Unicode edge cases specific to Japanese text
-
-This dramatically simplifies downstream pattern matching — patterns only need to match the canonical normalized form.
-
-**Failure conditions:**
-
-- Encoding detection failure → `InvalidInputError`
-- Empty input after normalization → `InvalidInputError`
-
-**Implementation notes:**
-
-- Use charset detection library for encoding
-- Apply neologdn.normalize() first, then NFKC
-- Preserve blank lines (structurally meaningful)
-
-### 3.2 Structural Analyzer
-
-**Responsibilities:**
-
-- Compute quote depth per line
-- Identify quote block boundaries
-- Detect forwarding headers and reply markers
-
-**Quote markers to detect:**
-
-- `>` and `＞` (full-width)
-- Indentation patterns (leading spaces/tabs)
-- `|` pipe quoting (less common)
-
-**Forward/reply patterns:**
-
-- `-----Original Message-----` and Japanese equivalents
-- `On [date] [person] wrote:` patterns
-- `転送:`, `Fwd:`, `Re:` in subject-like lines within body
-- Delimiter lines (long sequences of `-`, `─`, `━`, `=`, etc.)
-
-**Output:** Annotated line objects with:
-
-- Original text
-- Quote depth (0 = not quoted)
-- Is forward/reply header (boolean)
-- Preceding delimiter detected (boolean)
-
-### 3.3 Feature Extractor
-
-**Per-line features:**
-
-_Positional:_
-
-- Normalized position (0.0 to 1.0)
-- Reverse position (distance from end, normalized)
-- Lines from start (absolute)
-- Lines from end (absolute)
-- Position relative to first quote block
-- Position relative to last quote block
-
-_Content:_
-
-- Line length (characters)
-- Character class ratios:
-  - Kanji ratio
-  - Hiragana ratio
-  - Katakana ratio
-  - ASCII ratio
-  - Digit ratio
-  - Symbol/punctuation ratio
-- Leading whitespace count
-- Trailing whitespace count
-- Is blank line (boolean)
-
-_Pattern flags (boolean):_
-
-- Matches greeting pattern
-- Matches closing pattern
-- Contains contact information pattern (tel, fax, email, URL, postal code)
-- Contains company suffix pattern
-- Is visual separator line
-- Contains meta-discussion markers (e.g., "例えば", "以下の", "サンプル")
-- Line is inside quotation marks (「」or 『』)
-
-_Contextual (window ±2 lines):_
-
-- Aggregate pattern flags for surrounding lines
-- Blank line adjacency pattern
-- Transition pattern (e.g., "blank followed by short lines")
-
-**Feature encoding:**
-
-- Numeric features: use directly
-- Boolean features: 0/1 encoding
-- Ratios: 0.0 to 1.0
-
-### 3.4 CRF Sequence Labeler
-
-**Label scheme:**
-
-| Label     | Description                                             |
-| --------- | ------------------------------------------------------- |
-| GREETING  | Opening formulas (お世話になっております, 拝啓, etc.)   |
-| BODY      | Substantive content                                     |
-| CLOSING   | Closing formulas (よろしくお願いいたします, 敬具, etc.) |
-| SIGNATURE | Signature block lines                                   |
-| QUOTE     | Quoted content (any depth)                              |
-| OTHER     | Headers, noise, unclassifiable                          |
-
-**Model characteristics:**
-
-- Uses sklearn-crfsuite or equivalent
-- Trained on synthetic data (external generator)
-- Outputs both labels and marginal probabilities per label per line
-- Model file size target: < 10MB
-
-**Training considerations:**
-
-- L1/L2 regularization to prevent overfitting
-- Cross-validation on synthetic data for hyperparameter tuning
-- Stratified splits ensuring all template types represented
-
-### 3.5 Body Assembler
-
-**Core logic:**
-
-1. **Find signature boundary:** Scan for first line labeled SIGNATURE. If found, all content from that line onward is excluded from body consideration.
-
-2. **Classify quotes as inline vs trailing:**
-   - A QUOTE line is "inline" if there exists content (GREETING, BODY, or CLOSING) both before AND after it
-   - Only quotes at the very top (before any content) or very bottom (after all content) are considered leading/trailing and excluded from body
-
-3. **Build content blocks:**
-   - BODY lines accumulate into current block
-   - OTHER lines are buffered; included if followed by more content (neutral filler)
-   - Inline QUOTE lines are included in current block
-   - GREETING and CLOSING lines are included if adjacent to BODY
-   - Trailing/leading QUOTE lines create hard breaks
-
-4. **Select final body:**
-   - If signature was detected: concatenate all blocks before signature
-   - If no signature detected: select the longest block (by line count)
-
-5. **Assemble text:** Join selected lines preserving original line breaks
-
-**Edge case handling:**
-
-- Empty result after assembly → `NoBodyDetectedError`
-- Multiple equally-long blocks (no signature case) → take the first one
-
-### 3.6 Confidence Gate
-
-**Confidence computation:**
-
-- Base confidence: 10th percentile (P10) of marginal probabilities among body-labeled lines. Robust to outliers - one weak transition line won't tank the extraction. For sequences with <10 lines, P10 falls back to minimum.
-- Ambiguity penalty: if high-confidence BODY labels exist outside the selected body region, reduce confidence (suggests competing valid interpretations)
-
-**Thresholds:**
-
-- Confidence < 0.5 → `LowConfidenceError`
-- Ambiguity detection: if excluded BODY-labeled lines have confidence > 0.7, apply penalty
-
-**Configurable:** Thresholds should be adjustable via configuration for tuning.
+**Label scheme:** GREETING, BODY, CLOSING, SIGNATURE, QUOTE, OTHER
 
 ---
 
 ## 4. Pattern Databases
 
-**Important:** All patterns match against neologdn-normalized text. This means:
+> **See source code in `src/yomail/patterns/` for actual patterns.**
 
-- No need to handle full-width/half-width ASCII variants (all normalized to half-width)
-- No need to handle half-width katakana (all normalized to full-width)
-- No need to handle repeated prolonged sound marks
+Pattern modules implemented:
+- `greetings.py` — Japanese email opening formulas
+- `closings.py` — Japanese email closing formulas
+- `signatures.py` — Contact info, company names, positions
+- `separators.py` — Visual delimiter detection
+- `names.py` — Japanese name detection
 
-**Patterns still requiring variants** (neologdn does not collapse these):
-
-- Different separator characters: `-`, `─`, `━`, `=`, `＝` (different codepoints, not width variants)
-- Quote styles: `「」`, `『』`, `""`, `""`
-- Katakana prolonged sound mark `ー` vs kanji one `一` vs hyphen `-`
-
-### 4.1 Greeting Patterns
-
-Common Japanese email greetings to detect (match against normalized text). Examples (non-exhaustive):
-
-- お世話になっております
-- お世話になります
-- いつもお世話になっております
-- 拝啓
-- 前略
-- お疲れ様です
-- ご無沙汰しております
-- 初めてご連絡いたします
-- 突然のご連絡失礼いたします
-
-**Implementation:** Regex patterns with optional variations (spacing, particles, formality levels).
-
-### 4.2 Closing Patterns
-
-Common closing formulas. Examples:
-
-- よろしくお願いいたします
-- よろしくお願い申し上げます
-- 以上、よろしくお願いいたします
-- 敬具
-- 草々
-- ご確認よろしくお願いいたします
-- お手数をおかけしますが
-- 何卒よろしくお願いいたします
-
-### 4.3 Signature Patterns
-
-**Visual separators (still need multiple patterns — different characters, not width variants):**
-
-- Hyphen-minus lines: `---`
-- Box drawing lines: `───`, `━━━`
-- Equals lines: `===`
-- Underscore lines: `___`
-- Asterisk lines: `***`
-- Threshold: 3+ repeated separator characters
-
-**Contact information patterns (simplified after normalization):**
-
-- Phone: `TEL`, `Tel`, `電話` followed by number patterns (width-normalized)
-- Fax: `FAX`, `Fax`, `ファックス`
-- Email: `@` with surrounding valid characters, or `E-mail:`, `Mail:`
-- URL: `http://`, `https://`, `www.`
-- Postal code: `〒` followed by digits, or 7-digit patterns with hyphen
-
-**Company patterns:**
-
-- Suffixes: 株式会社, 有限会社, 合同会社, (株), (有) — parentheses normalized to half-width
-- Prefixes: 株式会社 can appear before company name
-
-**Position patterns:**
-
-- 部長, 課長, マネージャー, 代表, 担当, etc.
-
-### 4.4 Quote Patterns
-
-**Markers:**
-
-- `>` at line start (full-width `＞` normalized to half-width)
-- Multiple `>` for nested quotes
-- `|` at line start
-- Leading whitespace (indentation) in context of reply
-
-**Reply/forward headers:**
-
-- `On YYYY/MM/DD, [name] wrote:`
-- `YYYY年MM月DD日 HH:MM [name] wrote:`
-- `-----Original Message-----`
-- `---------- Forwarded message ---------`
-- Japanese equivalents
+All patterns match against neologdn-normalized text.
 
 ---
 
 ## 5. Public Interface
 
-### 5.1 Main Class
+> **See [ARCHITECTURE.md](ARCHITECTURE.md) for detailed API documentation.**
 
+```python
+from yomail import EmailBodyExtractor
+
+extractor = EmailBodyExtractor(confidence_threshold=0.5)
+
+# Strict - raises on failure
+body = extractor.extract(email_text)
+
+# Safe - returns None on failure
+body = extractor.extract_safe(email_text)
+
+# Full metadata
+result = extractor.extract_with_metadata(email_text)
 ```
-EmailBodyExtractor
-├── extract(email_text: str) → str
-│   Raises: LowConfidenceError, NoBodyDetectedError, InvalidInputError
-│
-├── extract_safe(email_text: str) → Optional[str]
-│   Returns None on any failure
-│
-└── extract_with_metadata(email_text: str) → ExtractionResult
-    Full result with confidence, labeled lines, metadata
-```
 
-### 5.2 Result Types
-
-**ExtractionResult:**
-
-- body: Optional[str]
-- confidence: float (0.0 - 1.0)
-- success: bool
-- error: Optional[ExtractionError]
-- labeled_lines: List[LabeledLine] (for debugging)
-- signature_detected: bool
-- inline_quotes_included: int
-
-**LabeledLine:**
-
-- text: str
-- label: str (one of the label types)
-- confidence: float
-- quote_depth: int
-
-### 5.3 Exceptions
-
-All inherit from base `ExtractionError`:
-
-- `LowConfidenceError`: Model confidence below threshold
-- `NoBodyDetectedError`: No body content found
-- `InvalidInputError`: Input not valid email or not Japanese
+**Exceptions:** `ExtractionError` (base), `InvalidInputError`, `NoBodyDetectedError`, `LowConfidenceError`
 
 ---
 
 ## 6. Command Line Interface
 
-Optional CLI for debugging and one-off extraction.
-
-### 6.1 Basic Usage
-
-```
-# Read from stdin
-cat email.txt | python -m yomail
-
-# Read from file
-python -m yomail email.txt
-
-# Output to file
-python -m yomail email.txt -o body.txt
-```
-
-### 6.2 Options
-
-- `-o, --output FILE`: Write output to file instead of stdout
-- `--mode {strict,safe,full}`: Extraction mode (default: strict)
-- `--confidence-threshold FLOAT`: Override default confidence threshold
-- `-v, --verbose`: Enable debug logging
-- `--version`: Show version and exit
-
-### 6.3 Exit Codes
-
-- `0`: Success
-- `1`: Extraction failed (low confidence, no body, invalid input)
-- `2`: Invalid arguments / usage error
-
-### 6.4 Full Mode Output
-
-When `--mode full` is specified, output is JSON:
-
-```json
-{
-  "body": "extracted text",
-  "confidence": 0.87,
-  "signature_detected": true,
-  "inline_quotes_included": 1
-}
-```
+> **Status:** Not implemented. The original design specified a CLI, but it was not prioritized for the initial release. Library usage is the primary interface.
 
 ---
 
@@ -546,84 +254,33 @@ An extraction is "acceptable" if:
 
 ## 9. Installation and Integration
 
-### 9.1 Installation
+> **See [README.md](README.md) for current installation instructions.**
 
 ```
 pip install yomail
 ```
 
-Or with training dependencies:
-
-```
-pip install yomail[train]
-```
-
-### 9.2 Library Usage
+Configuration is via constructor parameters:
 
 ```python
-from yomail import EmailBodyExtractor
-
-extractor = EmailBodyExtractor()
-
-# Simple extraction
-body = extractor.extract(email_text)
-
-# Safe extraction (returns None on failure)
-body = extractor.extract_safe(email_text)
-
-# Full metadata
-result = extractor.extract_with_metadata(email_text)
+extractor = EmailBodyExtractor(
+    model_path="path/to/model.crfsuite",  # Optional custom model
+    confidence_threshold=0.5,              # Minimum confidence
+)
 ```
 
-### 9.3 Configuration
-
-Environment variables (or pass to constructor):
-
-- `YOMAIL_CONFIDENCE_THRESHOLD`: float, default 0.5
-- `YOMAIL_LOG_LEVEL`: DEBUG/INFO/WARNING/ERROR
-
-### 9.4 Resource Targets
-
-| Resource                 | Target                     |
-| ------------------------ | -------------------------- |
-| Package size (installed) | < 20MB                     |
-| Runtime memory           | < 100MB typical, < 1GB max |
-| Cold import              | < 2s                       |
-| Hot latency              | < 500ms                    |
+> **Note:** Environment variable configuration (`YOMAIL_CONFIDENCE_THRESHOLD`, `YOMAIL_LOG_LEVEL`) was specified in the original design but not implemented.
 
 ---
 
 ## 10. Project Structure
 
-```
-yomail/
-├── src/
-│   └── yomail/
-│       ├── __init__.py
-│       ├── extractor.py          # Main EmailBodyExtractor
-│       ├── pipeline/
-│       │   ├── normalizer.py
-│       │   ├── structural.py
-│       │   ├── features.py
-│       │   ├── crf.py
-│       │   └── assembler.py
-│       ├── patterns/
-│       │   ├── greetings.py
-│       │   ├── closings.py
-│       │   ├── signatures.py
-│       │   └── quotes.py
-│       └── exceptions.py
-├── models/
-│   └── .gitkeep              # Model added after training
-├── tests/
-│   ├── unit/
-│   └── integration/
-├── scripts/
-│   ├── train.py
-│   └── evaluate.py
-├── pyproject.toml
-└── README.md
-```
+> **See [ARCHITECTURE.md](ARCHITECTURE.md) for the current module structure.**
+
+The actual implementation differs from the original design:
+- Added `content_filter.py` and `reconstructor.py` to pipeline
+- Pattern modules: `greetings.py`, `closings.py`, `signatures.py`, `separators.py`, `names.py` (no `quotes.py`)
+- Tests are flat in `tests/` (not split into `unit/` and `integration/`)
 
 ---
 
@@ -660,36 +317,30 @@ Tooling configuration should enforce different rules per directory. The implemen
 
 ## 12. Dependencies
 
-**Runtime:**
+> **See `pyproject.toml` for actual dependencies.**
 
+**Original design specified:**
+- sklearn-crfsuite (CRF implementation) → **Implemented with python-crfsuite** (sklearn-crfsuite unmaintained)
+- pydantic (data validation) → **Not used** (dataclasses used instead)
+- regex (Unicode support) → **Not used** (standard `re` sufficient)
+
+**Actual runtime dependencies:**
 - neologdn (Japanese text normalization)
-- sklearn-crfsuite (CRF implementation)
-- pydantic (data validation, optional but recommended)
-- regex (better Unicode support than re)
-
-**Training:**
-
-- scikit-learn (metrics, cross-validation)
-
-**Development:**
-
-- Linting, type checking, and testing tools per implementer's choice (configured per Section 11)
+- python-crfsuite (CRF implementation)
+- pyyaml (name data loading)
 
 ---
 
-## 13. Open Questions for Implementation
+## 13. Resolved Implementation Questions
 
-1. **Encoding detection library:** chardet vs charset-normalizer vs cchardet — evaluate for Japanese accuracy and speed.
+The following questions from the original design have been resolved:
 
-2. **CRF library:** sklearn-crfsuite is the obvious choice, but verify Python 3.13 compatibility.
-
-3. **neologdn options:** Evaluate whether to use `neologdn.normalize()` with default settings or customize (e.g., `repeat` parameter for controlling repeated character reduction).
-
-4. **Pattern database format:** Decide between compiled regex objects vs pattern strings compiled at load time.
-
-5. **Feature normalization:** Whether to apply standardization to numeric features before CRF training.
-
-6. **Model versioning:** Strategy for model file naming and backward compatibility.
+1. **Encoding detection:** Not implemented; assumes UTF-8 input
+2. **CRF library:** python-crfsuite (sklearn-crfsuite is unmaintained)
+3. **neologdn options:** Default settings with custom delimiter line handling
+4. **Pattern database format:** Compiled regex objects at module load time
+5. **Feature normalization:** No standardization; raw values work well with CRF
+6. **Model versioning:** Single bundled model at `src/yomail/data/email_body.crfsuite`
 
 ---
 

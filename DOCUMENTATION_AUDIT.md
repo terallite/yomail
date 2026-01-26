@@ -2,24 +2,37 @@
 
 **Audit Date:** 2026-01-26
 **Audited By:** Claude (Opus 4.5)
+**Status:** Partial remediation complete
 
 This document lists all identified discrepancies ("drift") between the documentation and the actual codebase implementation.
+
+## Remediation Summary
+
+The following changes were made to address audit findings:
+
+1. **DESIGN.md** — Added prominent disclaimer marking it as "original design specification (reference only)" and pointing to ARCHITECTURE.md for current implementation details
+2. **DESIGN.md** — Stripped detailed implementation specs that are now covered by ARCHITECTURE.md
+3. **DESIGN.md** — Added notes about unimplemented features (CLI, environment variables) and resolved implementation questions
+4. **ARCHITECTURE.md** — Fixed feature count from 35 to 37
+5. **ARCHITECTURE.md** — Added note marking it as authoritative documentation
+
+**Remaining issues** are noted with [OPEN] or [FIXED] tags below.
 
 ---
 
 ## Executive Summary
 
-| Severity | Count |
-|----------|-------|
-| High (functional impact) | 4 |
-| Medium (misleading claims) | 5 |
-| Low (minor inconsistencies) | 6 |
+| Severity | Original Count | Addressed | Remaining |
+|----------|----------------|-----------|-----------|
+| High (functional impact) | 4 | 3 | 1 |
+| Medium (misleading claims) | 5 | 4 | 1 |
+| Low (minor inconsistencies) | 6 | 4 | 2 |
 
 ---
 
 ## High Severity Issues
 
-### 1. README.md Example Output is Incorrect
+### 1. README.md Example Output is Incorrect [OPEN]
 
 **Location:** `README.md:64-74`
 
@@ -56,9 +69,11 @@ This document lists all identified discrepancies ("drift") between the documenta
 
 ---
 
-### 2. CLI Not Implemented
+### 2. CLI Not Implemented [FIXED]
 
 **Location:** `DESIGN.md:429-471`
+
+**Resolution:** DESIGN.md section 6 now notes that CLI was not implemented.
 
 **Claim:** DESIGN.md specifies a complete CLI with:
 - `python -m yomail` command
@@ -77,9 +92,11 @@ ls: cannot access '/home/user/yomail/src/yomail/__main__.py': No such file or di
 
 ---
 
-### 3. Environment Variable Configuration Not Implemented
+### 3. Environment Variable Configuration Not Implemented [FIXED]
 
 **Location:** `DESIGN.md:580-584`
+
+**Resolution:** DESIGN.md section 9 now notes that environment variables were not implemented.
 
 **Claim:** DESIGN.md states:
 > Environment variables (or pass to constructor):
@@ -98,9 +115,11 @@ The extractor only accepts `confidence_threshold` as a constructor parameter, no
 
 ---
 
-### 4. patterns/quotes.py Missing
+### 4. patterns/quotes.py Missing [FIXED]
 
 **Location:** `DESIGN.md:612-615`
+
+**Resolution:** DESIGN.md section 10 now documents the actual module structure and notes differences from original design.
 
 **Claim:** The project structure shows:
 ```
@@ -126,9 +145,11 @@ Note: Quote handling is embedded in `structural.py` instead of a dedicated `quot
 
 ## Medium Severity Issues
 
-### 5. Feature Count Mismatch
+### 5. Feature Count Mismatch [FIXED]
 
 **Location:** `ARCHITECTURE.md:134`
+
+**Resolution:** ARCHITECTURE.md now correctly states 37 features.
 
 **Claim:** "Features extracted per line (35 total)"
 
@@ -150,9 +171,11 @@ The ARCHITECTURE.md lists these two bracket features but the total count (35) do
 
 ---
 
-### 6. Model Size Contradiction Between Documents
+### 6. Model Size Contradiction Between Documents [FIXED]
 
 **Location:** `DESIGN.md:107` vs `ARCHITECTURE.md:12`, `README.md:11`
+
+**Resolution:** DESIGN.md section 13 now documents that model size is 12KB (resolved implementation question).
 
 **Claims:**
 - DESIGN.md says: "Memory: Model ~5MB"
@@ -171,9 +194,11 @@ The actual model is 12 KB. DESIGN.md's "~5MB" is inaccurate.
 
 ---
 
-### 7. Dependency Discrepancy
+### 7. Dependency Discrepancy [FIXED]
 
 **Location:** `DESIGN.md:662-669` vs `pyproject.toml`
+
+**Resolution:** DESIGN.md section 12 now documents original vs actual dependencies.
 
 **Claim:** DESIGN.md lists runtime dependencies:
 - neologdn
@@ -200,7 +225,7 @@ dependencies = [
 
 ---
 
-### 8. Performance Metrics Inconsistency
+### 8. Performance Metrics Inconsistency [OPEN]
 
 **Location:** `README.md:105-108` vs `PERFORMANCE.md:9-11`
 
@@ -214,9 +239,11 @@ dependencies = [
 
 ---
 
-### 9. CRF Library Discrepancy (Documented Deviation)
+### 9. CRF Library Discrepancy (Documented Deviation) [FIXED]
 
 **Location:** `DESIGN.md:239` vs `ARCHITECTURE.md:261`
+
+**Resolution:** DESIGN.md section 12 now explicitly documents that python-crfsuite is used instead of sklearn-crfsuite.
 
 **Claim:** DESIGN.md says "Uses sklearn-crfsuite or equivalent"
 
@@ -229,7 +256,7 @@ dependencies = [
 
 ## Low Severity Issues
 
-### 10. Training Data Output Path in README
+### 10. Training Data Output Path in README [OPEN]
 
 **Location:** `README.md:153`
 
@@ -249,9 +276,11 @@ The `models/` directory exists but is empty (contains only `.gitkeep`). The bund
 
 ---
 
-### 11. Missing ContentFilter and Reconstructor in DESIGN.md Pipeline
+### 11. Missing ContentFilter and Reconstructor in DESIGN.md Pipeline [FIXED]
 
 **Location:** `DESIGN.md:39-95`
+
+**Resolution:** DESIGN.md section 3 now points to ARCHITECTURE.md and lists the actual pipeline stages including ContentFilter and Reconstructor.
 
 **Claim:** DESIGN.md shows this pipeline:
 1. NORMALIZER
@@ -277,9 +306,11 @@ ARCHITECTURE.md documents these additions in the "Design Deviations from DESIGN.
 
 ---
 
-### 12. Confidence Computation Method
+### 12. Confidence Computation Method [FIXED]
 
 **Location:** `DESIGN.md:280-284` vs actual implementation
+
+**Resolution:** DESIGN.md section 3 now defers to ARCHITECTURE.md which correctly documents Viterbi probability as confidence.
 
 **Claim:** DESIGN.md states confidence is computed as:
 > "Base confidence: 10th percentile (P10) of marginal probabilities among body-labeled lines"
@@ -297,7 +328,7 @@ ARCHITECTURE.md documents this as an intentional deviation:
 
 ---
 
-### 13. Package Size Claim
+### 13. Package Size Claim [OPEN]
 
 **Location:** `PERFORMANCE.md:117`
 
@@ -309,9 +340,11 @@ ARCHITECTURE.md documents this as an intentional deviation:
 
 ---
 
-### 14. Test Directory Structure
+### 14. Test Directory Structure [FIXED]
 
 **Location:** `DESIGN.md:617-619`
+
+**Resolution:** DESIGN.md section 10 now notes that test structure differs from original design.
 
 **Claim:** Test directory structure shows:
 ```
@@ -334,9 +367,11 @@ Tests are flat, not organized into `unit/` and `integration/` subdirectories.
 
 ---
 
-### 15. Missing `yomail[train]` Optional Dependencies
+### 15. Missing `yomail[train]` Optional Dependencies [FIXED]
 
 **Location:** `DESIGN.md:555-558`
+
+**Resolution:** DESIGN.md section 9 now removes mention of `yomail[train]` and documents actual installation.
 
 **Claim:**
 ```
@@ -351,23 +386,31 @@ pip install yomail[train]
 
 ## Summary of Required Fixes
 
-### Critical (should fix immediately)
-1. Update README.md example with realistic output or add disclaimer about confidence threshold
-2. Either implement CLI or remove from DESIGN.md
-3. Either implement environment variables or remove from DESIGN.md
+### Remaining Issues (4 total)
 
-### Recommended (should fix soon)
-4. Update DESIGN.md with actual module structure (add names.py, separators.py; remove quotes.py)
-5. Fix feature count in ARCHITECTURE.md (35 → 37)
-6. Update DESIGN.md model size estimate (5MB → 12KB)
-7. Update DESIGN.md dependencies to match pyproject.toml
+**Critical:**
+1. [OPEN] Update README.md example with realistic output or add disclaimer about confidence threshold
 
-### Low Priority (nice to have)
-8. Align performance metrics precisely between README and PERFORMANCE.md
-9. Add note about bundled model location in README
-10. Update DESIGN.md pipeline to include ContentFilter and Reconstructor
-11. Update test directory structure documentation
-12. Add `[train]` optional dependencies or remove from docs
+**Low Priority:**
+2. [OPEN] Align performance metrics precisely between README and PERFORMANCE.md (98.0% vs 97.96%)
+3. [OPEN] Add note about bundled model location in README vs training output path
+4. [OPEN] Verify and update package size claim in PERFORMANCE.md
+
+### Addressed Issues (11 total)
+
+The following have been addressed by updating DESIGN.md and ARCHITECTURE.md:
+
+- ✅ CLI documentation (marked as not implemented)
+- ✅ Environment variable configuration (marked as not implemented)
+- ✅ Module structure documentation
+- ✅ Feature count (corrected to 37)
+- ✅ Model size documentation
+- ✅ Dependency documentation
+- ✅ CRF library documentation
+- ✅ Pipeline stage documentation
+- ✅ Confidence computation documentation
+- ✅ Test directory structure documentation
+- ✅ Training extras (`yomail[train]`) documentation
 
 ---
 
