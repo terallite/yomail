@@ -4,7 +4,7 @@ version = "0.1.0"
 description = "Extract body text from Japanese business emails"
 readme = "README.md"
 license = "MIT"
-requires-python = ">=3.13"
+requires-python = ">=3.12"
 authors = [
     { name = "terallite" },
     { name = "Linus Tan" },
@@ -15,6 +15,7 @@ classifiers = [
     "Intended Audience :: Developers",
     "License :: OSI Approved :: MIT License",
     "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.12",
     "Programming Language :: Python :: 3.13",
     "Topic :: Text Processing :: Linguistic",
     "Topic :: Communications :: Email",

@@ -17,7 +17,7 @@ yomail extracts body text from Japanese business emails. It uses a CRF (Conditio
 pip install yomail
 ```
 
-Requires Python 3.13+.
+Requires Python 3.12+.
 
 ## Usage
 
