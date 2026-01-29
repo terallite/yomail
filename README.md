@@ -83,7 +83,7 @@ The extraction pipeline:
 4. **Label with CRF** — GREETING, BODY, CLOSING, SIGNATURE, QUOTE, OTHER
 5. **Assemble body** — Find signature boundary, handle inline quotes, merge blocks
 
-See [ARCHITECTURE.md](ARCHITECTURE.md) for details.
+See [ARCHITECTURE.md](ARCHITECTURE.md) for details and [API.md](API.md) for the full API reference.
 
 ## Label Scheme
 
