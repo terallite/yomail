@@ -1,11 +1,12 @@
 # yomail (読メール)
 
-yomail extracts body text from Japanese business emails. It uses a CRF (Conditional Random Field) model to classify each line, then assembles the body from labeled lines.
+yomail extracts the message content from Japanese business emails. It uses a CRF (Conditional Random Field) model to classify each line, then assembles the content from labeled lines.
 
 ## Features
 
 - Handles formal and informal Japanese business emails
-- Detects and excludes signatures, greetings, closings, quoted content
+- Extracts greeting, body, and closing as unified message content
+- Excludes signatures and trailing/leading quoted content
 - Works with forwarded emails, replies, and inline quotes
 - Returns confidence scores for quality control
 - Small model size (12 KB)
@@ -83,7 +84,7 @@ The extraction pipeline:
 4. **Label with CRF** — GREETING, BODY, CLOSING, SIGNATURE, QUOTE, OTHER
 5. **Assemble body** — Find signature boundary, handle inline quotes, merge blocks
 
-See [ARCHITECTURE.md](ARCHITECTURE.md) for details.
+See [ARCHITECTURE.md](ARCHITECTURE.md) for details and [API.md](API.md) for the full API reference.
 
 ## Label Scheme
 
