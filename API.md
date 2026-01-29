@@ -8,7 +8,7 @@ This document provides a quick reference for yomail's public API.
 from yomail import EmailBodyExtractor
 
 extractor = EmailBodyExtractor()
-body = extractor.extract(email_text)
+content = extractor.extract(email_text)  # Returns greeting + body + closing
 ```
 
 ---
@@ -17,7 +17,11 @@ body = extractor.extract(email_text)
 
 ### EmailBodyExtractor
 
-The primary class for extracting body text from Japanese emails.
+The primary class for extracting message content from Japanese emails.
+
+**What gets extracted:** GREETING + BODY + CLOSING lines (and inline quotes between them).
+
+**What gets excluded:** SIGNATURE, leading/trailing QUOTE, and OTHER lines.
 
 ```python
 from yomail import EmailBodyExtractor
@@ -36,8 +40,8 @@ EmailBodyExtractor(
 
 | Method | Returns | Description |
 |--------|---------|-------------|
-| `extract(email_text: str)` | `str` | Extract body text. Raises on failure. |
-| `extract_safe(email_text: str)` | `str \| None` | Extract body text. Returns `None` on failure. |
+| `extract(email_text: str)` | `str` | Extract message content. Raises on failure. |
+| `extract_safe(email_text: str)` | `str \| None` | Extract message content. Returns `None` on failure. |
 | `extract_with_metadata(email_text: str)` | `ExtractionResult` | Extract with full metadata. |
 | `load_model(model_path: Path \| str)` | `None` | Load a custom CRF model. |
 
@@ -51,7 +55,7 @@ EmailBodyExtractor(
 
 ### ExtractionResult
 
-Returned by `extract_with_metadata()`. Contains the extracted body and debugging information.
+Returned by `extract_with_metadata()`. Contains the extracted content and debugging information.
 
 ```python
 from yomail import ExtractionResult
@@ -61,7 +65,7 @@ from yomail import ExtractionResult
 
 | Attribute | Type | Description |
 |-----------|------|-------------|
-| `body` | `str \| None` | Extracted body text, or `None` if failed. |
+| `body` | `str \| None` | Extracted message content (greeting + body + closing), or `None` if failed. |
 | `confidence` | `float` | Confidence score (0.0 to 1.0). |
 | `success` | `bool` | Whether extraction succeeded. |
 | `error` | `ExtractionError \| None` | Error if failed, `None` otherwise. |
@@ -107,14 +111,16 @@ Label = Literal["GREETING", "BODY", "CLOSING", "SIGNATURE", "QUOTE", "OTHER"]
 LABELS: tuple[Label, ...] = ("GREETING", "BODY", "CLOSING", "SIGNATURE", "QUOTE", "OTHER")
 ```
 
-| Label | Description | Example |
-|-------|-------------|---------|
-| `GREETING` | Opening formulas | お世話になっております |
-| `BODY` | Main content | 資料を添付いたします |
-| `CLOSING` | Closing formulas | よろしくお願いいたします |
-| `SIGNATURE` | Sender information | 山田太郎 / TEL: 03-1234-5678 |
-| `QUOTE` | Quoted content | > 前回のメール内容 |
-| `OTHER` | Separators, noise | ────────── |
+| Label | Description | Example | Included in output? |
+|-------|-------------|---------|---------------------|
+| `GREETING` | Opening formulas | お世話になっております | Yes |
+| `BODY` | Main content | 資料を添付いたします | Yes |
+| `CLOSING` | Closing formulas | よろしくお願いいたします | Yes |
+| `SIGNATURE` | Sender information | 山田太郎 / TEL: 03-1234-5678 | No |
+| `QUOTE` | Quoted content | > 前回のメール内容 | Inline only* |
+| `OTHER` | Separators, noise | ────────── | Between content only |
+
+*Inline quotes (with content before AND after) are included; leading/trailing quotes are excluded.
 
 ---
 
